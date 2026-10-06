@@ -1,0 +1,25 @@
+{
+  "name": "agents-dailies",
+  "version": "0.1.0",
+  "description": "A live review page for what your coding agent makes: images, videos, audio and 3D models in one browser tab instead of windows, decisions made there, and replies brought back to the agent.",
+  "keywords": ["claude-code", "coding-agent", "dailies", "review", "viewer", "assets", "gamedev"],
+  "license": "MIT",
+  "author": "AsK",
+  "type": "module",
+  "bin": {
+    "agents-dailies": "dist/cli.js"
+  },
+  "files": ["bin", "dist", "src", "web", "hooks", "skills", ".claude-plugin", "docs", "README.md", "README.ja.md", "LICENSE"],
+  "engines": {
+    "node": ">=22.6"
+  },
+  "scripts": {
+    "setup": "npm install --prefix dev",
+    "typecheck": "dev/node_modules/.bin/tsc -p tsconfig.json --noEmit",
+    "test": "node --test --test-reporter=spec \"test/**/*.test.ts\"",
+    "build": "dev/node_modules/.bin/tsc -p tsconfig.build.json && chmod +x dist/cli.js",
+    "verify": "npm run typecheck && npm test && npm run build",
+    "vendor": "cp dev/node_modules/@google/model-viewer/dist/model-viewer.min.js web/vendor/",
+    "prepack": "npm run build"
+  }
+}

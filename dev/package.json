@@ -1,0 +1,10 @@
+{
+  "name": "agents-dailies-dev",
+  "private": true,
+  "description": "Tooling for developing agents-dailies. The tool itself has no dependencies; keeping these out of the root package.json keeps Claude Code from installing them with the plugin.",
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.8.0",
+    "@google/model-viewer": "^4.3.1"
+  }
+}

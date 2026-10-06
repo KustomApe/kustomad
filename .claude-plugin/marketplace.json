@@ -1,0 +1,12 @@
+{
+  "name": "agents-dailies",
+  "owner": { "name": "AsK" },
+  "description": "agents-dailies: a live review page for what coding agents make",
+  "plugins": [
+    {
+      "name": "agents-dailies",
+      "source": "./",
+      "description": "Show what the agent makes in one live browser tab, ask you to decide there, and bring your replies and answers back to the agent"
+    }
+  ]
+}

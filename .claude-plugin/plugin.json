@@ -1,0 +1,7 @@
+{
+  "name": "agents-dailies",
+  "version": "0.1.0",
+  "description": "Show what the agent makes in one live browser tab, ask you to decide there, and bring your replies and answers back to the agent",
+  "author": { "name": "AsK" },
+  "license": "MIT"
+}

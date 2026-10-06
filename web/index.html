@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="color-scheme" content="dark light" />
+		<title>agents dailies</title>
+		<link rel="icon" href="/icon.svg" type="image/svg+xml" />
+		<link rel="stylesheet" href="/style.css" />
+	</head>
+	<body>
+		<header class="top">
+			<button class="icon-btn drawer-btn" id="drawer-btn" type="button" data-i18n-label="sidebar">☰</button>
+			<a class="brand" href="#" id="brand">
+				<img src="/icon.svg" alt="" width="24" height="24" />
+				<span class="brand-name">agents dailies</span>
+			</a>
+			<nav class="tabs" id="tabs">
+				<button type="button" class="tab" data-mode="dailies"><span class="tab-label" data-i18n="modeDailies"></span><span class="tab-count"></span></button>
+				<button type="button" class="tab" data-mode="devlog"><span class="tab-label" data-i18n="modeDevlog"></span><span class="tab-count"></span></button>
+			</nav>
+			<div class="scope" id="scope" hidden>
+				<span class="scope-text" id="scope-text"></span>
+				<button type="button" class="scope-clear" id="scope-clear" data-i18n-label="clearScope">×</button>
+			</div>
+			<span class="spacer"></span>
+			<button type="button" class="waiting-btn" id="waiting-btn" hidden></button>
+			<span class="conn" id="conn"><span class="conn-dot"></span><span class="conn-text" id="conn-text"></span></span>
+		</header>
+
+		<button type="button" class="new-pill" id="new-pill" hidden></button>
+
+		<div class="shell">
+			<aside class="side" id="side">
+				<div class="side-search">
+					<input type="search" id="search" autocomplete="off" spellcheck="false" />
+				</div>
+				<nav class="tree" id="tree"></nav>
+			</aside>
+			<div class="side-scrim" id="side-scrim"></div>
+			<main class="main" id="main">
+				<section class="issue-card" id="issue-card" hidden></section>
+				<div class="feed" id="feed" aria-live="polite"></div>
+				<div class="more" id="more" hidden><button type="button" id="more-btn" class="btn"></button></div>
+				<section class="empty" id="empty" hidden></section>
+			</main>
+		</div>
+
+		<footer class="keys" id="keys"></footer>
+
+		<div class="lightbox" id="lightbox" hidden>
+			<div class="lb-stage" id="lb-stage"></div>
+			<div class="lb-bar">
+				<span class="lb-caption" id="lb-caption"></span>
+				<span class="spacer"></span>
+				<button type="button" class="btn ghost" id="lb-note" data-i18n="noteOnFile"></button>
+				<button type="button" class="icon-btn" id="lb-prev" aria-label="Previous">‹</button>
+				<button type="button" class="icon-btn" id="lb-next" aria-label="Next">›</button>
+				<button type="button" class="icon-btn" id="lb-close" aria-label="Close">×</button>
+			</div>
+		</div>
+
+		<div class="toast" id="toast" hidden></div>
+
+		<script src="/i18n.js"></script>
+		<script src="/app.js"></script>
+	</body>
+</html>
