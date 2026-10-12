@@ -18,7 +18,7 @@ type Env = Record<string, string | undefined>;
 
 /** The command that prints an issue as JSON, from the environment or the user's own config. */
 export function issueCommandFor(project: string | undefined, env: Env = process.env): string | undefined {
-	if (env.AGENTS_DAILIES_ISSUE_COMMAND) return env.AGENTS_DAILIES_ISSUE_COMMAND;
+	if (env.KUSTOMAD_ISSUE_COMMAND) return env.KUSTOMAD_ISSUE_COMMAND;
 	const config = readConfig(env);
 	return (project && config.projects?.[project]?.issueCommand) || config.issueCommand || undefined;
 }

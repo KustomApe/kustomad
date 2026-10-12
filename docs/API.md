@@ -1,4 +1,4 @@
-# agents-dailies — viewer API
+# KustomAD — viewer API
 
 The viewer (`src/server.ts`) serves the page from `web/` and a JSON API. Everything below is
 what the page (`web/app.js`) and the CLI (`src/client.ts`) rely on.

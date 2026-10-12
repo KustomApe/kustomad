@@ -28,18 +28,18 @@ test("everything else passes", () => {
 	assert.deepEqual(openedMedia("cp a.png b.png"), []);
 	assert.deepEqual(openedMedia("ffmpeg -i in.mp4 out.gif"), []);
 	assert.deepEqual(openedMedia("echo xdg-open a.png"), []);
-	assert.deepEqual(openedMedia("agents-dailies show a.png"), []);
+	assert.deepEqual(openedMedia("kustomad show a.png"), []);
 });
 
 test("the hook blocks with the show command to use instead", () => {
 	const decision = preToolUse({ tool_name: "Bash", tool_input: { command: "xdg-open 'out/a b.png' out/c.mp4" } });
 	assert.equal(decision.block, true);
-	assert.match(decision.message ?? "", /agents-dailies show 'out\/a b\.png' out\/c\.mp4 --title/);
+	assert.match(decision.message ?? "", /kustomad show 'out\/a b\.png' out\/c\.mp4 --title/);
 });
 
 test("the hook lets other tools, other commands and explicit requests through", () => {
 	assert.equal(preToolUse({ tool_name: "Read", tool_input: { file_path: "a.png" } }).block, false);
 	assert.equal(preToolUse({ tool_name: "Bash", tool_input: { command: "ls" } }).block, false);
-	assert.equal(preToolUse({ tool_name: "Bash", tool_input: { command: "AGENTS_DAILIES_ALLOW_OPEN=1 xdg-open a.png" } }).block, false);
+	assert.equal(preToolUse({ tool_name: "Bash", tool_input: { command: "KUSTOMAD_ALLOW_OPEN=1 xdg-open a.png" } }).block, false);
 	assert.equal(preToolUse(undefined).block, false);
 });

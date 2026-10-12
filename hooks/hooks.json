@@ -1,5 +1,5 @@
 {
-  "description": "Point the agent at the agents-dailies viewer, stop it opening media in windows, hand it the user's comments, and note merged work for the devlog",
+  "description": "Point the agent at the KustomAD viewer, stop it opening media in windows, hand it the user's comments, and note merged work for the devlog",
   "hooks": {
     "SessionStart": [
       { "hooks": [{ "type": "command", "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/run.sh\" session-start", "timeout": 10 }] }

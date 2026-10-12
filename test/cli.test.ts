@@ -10,9 +10,9 @@ const CLI = fileURLToPath(new URL("../src/cli.ts", import.meta.url));
 const dir = tempDir();
 const env = {
 	...process.env,
-	AGENTS_DAILIES_HOME: join(dir, "home"),
-	AGENTS_DAILIES_PORT: String(47000 + Math.floor(Math.random() * 2000)),
-	AGENTS_DAILIES_NO_OPEN: "1",
+	KUSTOMAD_HOME: join(dir, "home"),
+	KUSTOMAD_PORT: String(47000 + Math.floor(Math.random() * 2000)),
+	KUSTOMAD_NO_OPEN: "1",
 	CLAUDE_CODE_SESSION_ID: "cli-session",
 };
 const run = (args: string[], input?: string) =>
@@ -153,8 +153,8 @@ test("the Stop hook asks to wait only for an unanswered question, once", async (
 	assert.equal((await run(["show", writeFile(dir, "later.png", PNG), "--json"])).code, 0);
 	const stop = await run(["hook", "stop"], JSON.stringify({ session_id: "cli-session" }));
 	assert.equal(stop.code, 2);
-	assert.match(stop.stderr, new RegExp(`agents-dailies wait ${post.id}`));
-	assert.doesNotMatch(stop.stderr, /agents-dailies watch/);
+	assert.match(stop.stderr, new RegExp(`kustomad wait ${post.id}`));
+	assert.doesNotMatch(stop.stderr, /kustomad watch/);
 	assert.equal((await run(["hook", "stop"], JSON.stringify({ session_id: "cli-session" }))).code, 0, "only once per question");
 });
 
@@ -190,7 +190,7 @@ test("issue describes an issue, or fetches it with the configured command", asyn
 		execFile(
 			process.execPath,
 			[CLI, "issue", "ABC-3", "--refresh", "--json"],
-			{ env: { ...env, AGENTS_DAILIES_ISSUE_COMMAND: `printf '{"title":"From the tracker","body":"Details","state":"OPEN"}'` }, cwd: dir },
+			{ env: { ...env, KUSTOMAD_ISSUE_COMMAND: `printf '{"title":"From the tracker","body":"Details","state":"OPEN"}'` }, cwd: dir },
 			(error, stdout) => resolve({ code: error ? 1 : 0, stdout }),
 		),
 	);
@@ -201,7 +201,7 @@ test("issue describes an issue, or fetches it with the configured command", asyn
 });
 
 test("the launcher runs the sources with no install", async () => {
-	const launcher = fileURLToPath(new URL("../bin/agents-dailies", import.meta.url));
+	const launcher = fileURLToPath(new URL("../bin/kustomad", import.meta.url));
 	const { stdout } = await promisify(execFile)("sh", [launcher, "--version"], { env });
 	assert.match(stdout, /^\d+\.\d+\.\d+\n$/);
 });
@@ -216,7 +216,7 @@ test("the plugin hook script puts the launcher on PATH at session start", async 
 		child.stdout!.on("data", (chunk: Buffer) => (text += chunk.toString()));
 		child.on("exit", () => resolve(text));
 	});
-	assert.match(output, /agents-dailies show/);
+	assert.match(output, /kustomad show/);
 	const { readFileSync } = await import("node:fs");
 	assert.match(readFileSync(envFile, "utf8"), /^export PATH=".*\/bin:\$PATH"$/m);
 });
@@ -224,6 +224,6 @@ test("the plugin hook script puts the launcher on PATH at session start", async 
 test("the PreToolUse hook blocks opening an image", async () => {
 	const result = await run(["hook", "pre-tool-use"], JSON.stringify({ tool_name: "Bash", tool_input: { command: "xdg-open shot.png" } }));
 	assert.equal(result.code, 2);
-	assert.match(result.stderr, /agents-dailies show shot\.png/);
+	assert.match(result.stderr, /kustomad show shot\.png/);
 	assert.equal((await run(["hook", "pre-tool-use"], JSON.stringify({ tool_name: "Bash", tool_input: { command: "ls" } }))).code, 0);
 });

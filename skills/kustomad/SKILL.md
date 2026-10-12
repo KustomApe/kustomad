@@ -1,9 +1,9 @@
 ---
-name: agents-dailies
-description: Show the user your work in progress (images, videos, GIFs, audio, 3D models, PDFs, HTML, Markdown, text) in the agents-dailies viewer — one live browser tab — and ask them to choose there between things to look at (pick a render, sign off on how something looks), instead of opening windows, printing paths or publishing an Artifact. Questions answered from words alone stay in the terminal. Use whenever you want the user to look at something you made ("show me", "let me see", "open it", "見せて", "開いて", "比べたい"), need them to choose between things you made ("which one looks better", "どっちがいい", "見比べて選んで", "見た目をレビューして"), look back on merged work or summarize a period ("devlog", "制作記録", "ふりかえり", "前回からの変更", "アップデートのまとめ"), or they refer to something on that page ("this one", "the left one", "これ", "左の", "今見てるやつ", "採用したやつ").
+name: kustomad
+description: Show the user your work in progress (images, videos, GIFs, audio, 3D models, PDFs, HTML, Markdown, text) in the KustomAD viewer — one live browser tab — and ask them to choose there between things to look at (pick a render, sign off on how something looks), instead of opening windows, printing paths or publishing an Artifact. Questions answered from words alone stay in the terminal. Use whenever you want the user to look at something you made ("show me", "let me see", "open it", "見せて", "開いて", "比べたい"), need them to choose between things you made ("which one looks better", "どっちがいい", "見比べて選んで", "見た目をレビューして"), look back on merged work or summarize a period ("devlog", "制作記録", "ふりかえり", "前回からの変更", "アップデートのまとめ"), or they refer to something on that page ("this one", "the left one", "これ", "左の", "今見てるやつ", "採用したやつ").
 ---
 
-# agents-dailies
+# KustomAD
 
 The user keeps one browser tab open: the viewer. Whatever you show or ask appears at
 its top, live, grouped by repository → issue (or branch) → session. They reply to what
@@ -14,8 +14,8 @@ you show (OK, or a note — on the whole post or on one file) and answer your qu
 
 | Situation | Use |
 | --- | --- |
-| Work in progress to look at | `agents-dailies show` |
-| A choice between things to look at: which render, how it looks, what to keep | `agents-dailies ask` |
+| Work in progress to look at | `kustomad show` |
+| A choice between things to look at: which render, how it looks, what to keep | `kustomad ask` |
 | A page other people read, or that outlives this work (report, shared doc) | an Artifact |
 | Any question answered from words alone — approach, yes/no, a name, what next | the terminal |
 
@@ -24,7 +24,7 @@ A post with nothing to look at is noise on the page; keep word-only questions in
 ## Show
 
 ```sh
-agents-dailies show <file>… --title "<what to look at>" [--note "<what changed>"] [--tag before|after]
+kustomad show <file>… --title "<what to look at>" [--note "<what changed>"] [--tag before|after]
 ```
 
 - Put alternatives in one call so they sit side by side.
@@ -36,7 +36,7 @@ agents-dailies show <file>… --title "<what to look at>" [--note "<what changed
 Files and sentences become options A, B, C… in the order given:
 
 ```sh
-agents-dailies ask "Which front view do we keep?" a.png b.png --option "Neither — redraw it" \
+kustomad ask "Which front view do we keep?" a.png b.png --option "Neither — redraw it" \
   --why "B matches the back view best; A loses the cape."
 ```
 
@@ -44,13 +44,13 @@ agents-dailies ask "Which front view do we keep?" a.png b.png --option "Neither 
 with `--about` (a single file next to sentences is refused — it would become option A):
 
 ```sh
-agents-dailies ask "Ship this cut?" --about cut.mp4 --option "OK as it is" --option "Fix something (note it)"
+kustomad ask "Ship this cut?" --about cut.mp4 --option "OK as it is" --option "Fix something (note it)"
 ```
 
 An option shown by several files is a pattern:
 
 ```sh
-agents-dailies ask "Which palette do we keep?" \
+kustomad ask "Which palette do we keep?" \
   --pattern "Current" current_front.png current_back.png \
   --pattern "Warmer" warm_front.png warm_back.png \
   --option "Neither — try again"
@@ -78,7 +78,7 @@ Several decisions at once (a review sheet), files relative to the sheet:
 ```
 
 ```sh
-agents-dailies ask --file sheet.json
+kustomad ask --file sheet.json
 ```
 
 Write sheets in the user's language and do not prefix labels with "A:" — letters are added.
@@ -86,7 +86,7 @@ Write sheets in the user's language and do not prefix labels with "A:" — lette
 Then wait in the background (Bash `run_in_background`, timeout 7200000):
 
 ```sh
-agents-dailies wait <post-id>
+kustomad wait <post-id>
 ```
 
 It exits with every answer (or as soon as the user comments on the post), which wakes
@@ -94,12 +94,12 @@ you. Act on the answers; for the next round, ask again in a new post.
 
 ## Hear back
 
-- `agents-dailies context` — what they selected (or the newest post): files with readable
+- `kustomad context` — what they selected (or the newest post): files with readable
   paths, answers, replies. Run it first when they say "this one" / "これ".
-- `agents-dailies watch` in the background — exits when they comment on anything you
+- `kustomad watch` in the background — exits when they comment on anything you
   showed this session. Restart it only while you still expect a reply.
-- `agents-dailies feedback [--since 2h] [--all]`, `agents-dailies list [--all]`,
-  `agents-dailies get <item-id> [--to PATH]`.
+- `kustomad feedback [--since 2h] [--all]`, `kustomad list [--all]`,
+  `kustomad get <item-id> [--to PATH]`.
 - `--json` on `show`, `ask`, `context`, `feedback`, `list` gives exact fields.
 
 ## Devlog
@@ -112,7 +112,7 @@ merge and it went through — not at each branch commit), look back over the ses
 it changed something a person using the product would notice, record it:
 
 ```sh
-agents-dailies devlog add --title "Thief's cape reads at game size" \
+kustomad devlog add --title "Thief's cape reads at game size" \
   --before i_mupkr1c5fdf43e --after shots/cape_after.png shots/cape_run.mp4 --summary - <<'EOF'
 The cape was a flat plate from the back; it is now thick and follows the run.
 ## 工夫
@@ -141,19 +141,19 @@ Correct an entry instead of adding another (only what you give is replaced; the 
 record is kept):
 
 ```sh
-agents-dailies devlog edit p_mupkr0a1b2c3 --before shots/cape_before.png --reason "the before was from the wrong commit"
-agents-dailies devlog edit p_mupkr0a1b2c3 --summary - <<'EOF'    # only the sections present are replaced
+kustomad devlog edit p_mupkr0a1b2c3 --before shots/cape_before.png --reason "the before was from the wrong commit"
+kustomad devlog edit p_mupkr0a1b2c3 --summary - <<'EOF'    # only the sections present are replaced
 ## 苦労
 The hood clipped the horns until it was left out by vertex group.
 EOF
-agents-dailies devlog retract p_mupkr0a1b2c3 --reason "recorded twice"   # --undo brings it back
+kustomad devlog retract p_mupkr0a1b2c3 --reason "recorded twice"   # --undo brings it back
 ```
 
 To write an update since the previous one, take the period from that update itself:
 
 ```sh
-agents-dailies devlog summary --since "2026-10-01 18:00"   # entries, decisions, commits, transcripts
+kustomad devlog summary --since "2026-10-01 18:00"   # entries, decisions, commits, transcripts
 ```
 
-`agents-dailies devlog list [--all]` shows entries. The viewer keeps the devlog on its
+`kustomad devlog list [--all]` shows entries. The viewer keeps the devlog on its
 own tab (Devlog), apart from review posts (Dailies).

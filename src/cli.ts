@@ -143,14 +143,14 @@ function viewerLine(viewers: number, opened: boolean, offline: boolean): string 
 	if (offline) return `The viewer could not start (see ${join(storeHome(env), "server.log")}); the post is kept and will show once it runs.`;
 	if (viewers) return `The viewer is open in ${viewers} tab${viewers === 1 ? "" : "s"}; it updated in place. No need to open anything.`;
 	if (opened) return "Opened the viewer in the browser.";
-	return `No viewer tab is open; the user can open ${viewerUrl(env)}/ (agents-dailies open).`;
+	return `No viewer tab is open; the user can open ${viewerUrl(env)}/ (kustomad open).`;
 }
 
 // show ------------------------------------------------------------------------
 
 async function show(argv: string[]): Promise<void> {
 	const args = parse(argv, { flags: ["--no-open", "--json"], values: ["--title", "--note", "--issue", "--lane"], lists: ["--tag"] });
-	if (!args.positional.length) fail("show what? agents-dailies show <file>… --title \"…\"");
+	if (!args.positional.length) fail("show what? kustomad show <file>… --title \"…\"");
 	const target = store();
 	const items = await addFiles(target, args.positional);
 	const where = detectWhere(process.cwd(), env);
@@ -292,7 +292,7 @@ async function ask(argv: string[]): Promise<void> {
 		title ??= read.title;
 		note ??= read.note;
 	} else {
-		if (!text) fail('ask what? agents-dailies ask "<question>" a.png b.png [--option "…"]');
+		if (!text) fail('ask what? kustomad ask "<question>" a.png b.png [--option "…"]');
 		const files = choices.filter((choice) => choice.kind === "file");
 		const patterns = choices.filter((choice) => choice.kind === "pattern");
 		const sentences = choices.filter((choice) => choice.kind === "text");
@@ -301,7 +301,7 @@ async function ask(argv: string[]): Promise<void> {
 			fail(`one file next to sentences would make the file itself option A. To sign off on it, show it above the options: --about ${path}`);
 		}
 		if (choices.length < 2) {
-			if (files.length === 1) fail(`one file alone is not a choice. To sign off on it: agents-dailies ask "${text}" --about ${(files[0] as { path: string }).path} --option "OK" --option "Redo it"`);
+			if (files.length === 1) fail(`one file alone is not a choice. To sign off on it: kustomad ask "${text}" --about ${(files[0] as { path: string }).path} --option "OK" --option "Redo it"`);
 			fail("a question needs at least two options (files, --pattern groups or --option texts)");
 		}
 		if (!files.length && !patterns.length && !about.length && !anyway) {
@@ -340,7 +340,7 @@ async function ask(argv: string[]): Promise<void> {
 		}
 	}
 	lines.push(viewerLine(result.viewers, opened, offline));
-	lines.push(`Now start the wait in the background (Bash run_in_background, timeout 7200000): agents-dailies wait ${result.post.id}`);
+	lines.push(`Now start the wait in the background (Bash run_in_background, timeout 7200000): kustomad wait ${result.post.id}`);
 	print(lines.join("\n"));
 }
 
@@ -384,7 +384,7 @@ async function waitFor(postId: string, timeoutMs: number, asJson = false): Promi
 		json({ post: catalog.view(post), finished });
 	} else {
 		print(describePost(catalog, post));
-		if (!finished) print(`Still waiting. Run agents-dailies wait ${id} again (in the background) to keep waiting.`);
+		if (!finished) print(`Still waiting. Run kustomad wait ${id} again (in the background) to keep waiting.`);
 	}
 	if (!finished) process.exitCode = 3;
 }
@@ -392,13 +392,13 @@ async function waitFor(postId: string, timeoutMs: number, asJson = false): Promi
 async function waitCommand(argv: string[]): Promise<void> {
 	const args = parse(argv, { flags: ["--json"], values: ["--timeout"] });
 	const id = args.positional[0];
-	if (!id) fail("wait for which post? agents-dailies wait <post-id>");
+	if (!id) fail("wait for which post? kustomad wait <post-id>");
 	return waitFor(id, durationMs(args.values.get("--timeout"), 110 * 60_000), args.flags.has("--json"));
 }
 
 async function watch(argv: string[]): Promise<void> {
 	const args = parse(argv, { flags: ["--json"], values: ["--session", "--timeout"] });
-	const session = args.values.get("--session") ?? env.CLAUDE_CODE_SESSION_ID ?? env.AGENTS_DAILIES_SESSION;
+	const session = args.values.get("--session") ?? env.CLAUDE_CODE_SESSION_ID ?? env.KUSTOMAD_SESSION;
 	if (!session) fail("watch needs the agent session (CLAUDE_CODE_SESSION_ID or --session)");
 	const target = store();
 	const ready = () => {
@@ -407,7 +407,7 @@ async function watch(argv: string[]): Promise<void> {
 	};
 	const finished = ready() || (await follow(target, `/api/watch?session=${encodeURIComponent(session)}`, (type) => type === "feedback" && ready(), { timeoutMs: durationMs(args.values.get("--timeout"), 110 * 60_000), env, onConnect: ready }));
 	if (!finished) {
-		print("No feedback yet. Start agents-dailies watch again (in the background) only while you still expect a reply.");
+		print("No feedback yet. Start kustomad watch again (in the background) only while you still expect a reply.");
 		process.exitCode = 3;
 		return;
 	}
@@ -492,7 +492,7 @@ async function list(argv: string[]): Promise<void> {
 async function get(argv: string[]): Promise<void> {
 	const args = parse(argv, { values: ["--to"] });
 	const ref = args.positional[0];
-	if (!ref) fail("get which file? agents-dailies get <item-id|post-id:n>");
+	if (!ref) fail("get which file? kustomad get <item-id|post-id:n>");
 	const target = store();
 	const catalog = target.load();
 	let item: Item | undefined;
@@ -524,7 +524,7 @@ async function issue(argv: string[]): Promise<void> {
 	const args = parse(argv, { flags: ["--refresh", "--json", "--quiet"], values: ["--title", "--description", "--status", "--url"] });
 	const where = detectWhere(process.cwd(), env);
 	const key = (args.positional[0] ?? where.issue)?.toUpperCase();
-	if (!key) fail("which issue? agents-dailies issue <KEY> (no issue key in this branch name)");
+	if (!key) fail("which issue? kustomad issue <KEY> (no issue key in this branch name)");
 	if (!ISSUE_KEY.test(key)) fail(`${key} is not an issue key`);
 	const target = store();
 	const quiet = args.flags.has("--quiet");
@@ -532,7 +532,7 @@ async function issue(argv: string[]): Promise<void> {
 	let event: IssueEvent | undefined;
 	if (args.flags.has("--refresh")) {
 		const command = issueCommandFor(where.project, env);
-		if (!command) fail(`no issue command configured: set "issueCommand" in ${join("~/.config/agents-dailies", "config.json")} or AGENTS_DAILIES_ISSUE_COMMAND`);
+		if (!command) fail(`no issue command configured: set "issueCommand" in ${join("~/.config/kustomad", "config.json")} or KUSTOMAD_ISSUE_COMMAND`);
 		markFetched(target, key);
 		const fields = await fetchIssue(command, key, process.cwd());
 		const base = await ensureViewer(target, env);
@@ -634,7 +634,7 @@ async function devlogAdd(argv: string[]): Promise<void> {
 		const missing = notOnMain(cwd, commits.map((commit) => commit.sha), main);
 		if (missing.length) fail(`${missing.length} of these commits are not on ${main} yet; ${ONLY_MERGED}`);
 		const already = commits.filter((commit) => recorded.has(commit.sha));
-		if (already.length === commits.length) fail(`these commits are already in a devlog entry; correct that entry with agents-dailies devlog edit`);
+		if (already.length === commits.length) fail(`these commits are already in a devlog entry; correct that entry with kustomad devlog edit`);
 		commits = commits.filter((commit) => !recorded.has(commit.sha));
 	} else {
 		const state = session ? target.readSession(session) : undefined;
@@ -643,7 +643,7 @@ async function devlogAdd(argv: string[]): Promise<void> {
 			commits = landed.flatMap((landing) => landing.commits.map((commit) => (landing.root === info?.root ? commit : { ...commit, repo: landing.project })));
 			issueKey ??= landed.map((landing) => issueFromBranch(landing.from)).find(Boolean);
 		} else if (state?.landing?.length && landings(state).length) {
-			fail("the merged work of this session is already in a devlog entry; correct that entry with agents-dailies devlog edit <p_…>, or pass --commits A..B for other work");
+			fail("the merged work of this session is already in a devlog entry; correct that entry with kustomad devlog edit <p_…>, or pass --commits A..B for other work");
 		} else if (info && main && info.branch && info.branch !== main) {
 			const ahead = commitsIn(cwd, `${main}..HEAD`);
 			if (ahead.length) fail(`work on ${info.branch} is not on ${main} yet; ${ONLY_MERGED} (or --commits none for work without commits)`);
@@ -675,16 +675,16 @@ async function devlogAdd(argv: string[]): Promise<void> {
 	const lines = [`Recorded the devlog entry ${id} ("${result.post.title ?? sections.summary?.split("\n")[0]}"): ${result.url}`];
 	lines.push(`  before ${before.length} · after ${after.length} · ${commits.length} commit${commits.length === 1 ? "" : "s"}${issueKey ? ` · ${issueKey}` : ""}`);
 	if (!sections.craft && !sections.struggle) lines.push("No craft (工夫) or struggle (苦労) written: those are what devlog posts and videos are made of. Add them if there is anything to tell.");
-	if (!before.length && !after.length) lines.push(`No before/after pair. If the change can be seen or heard, add both: agents-dailies devlog edit ${id} --before <file|i_…> --after <file|i_…>`);
-	else if (!before.length || !after.length) lines.push(`Only ${before.length ? "a before" : "an after"}: add the other if it can be captured: agents-dailies devlog edit ${id} --${before.length ? "after" : "before"} <file|i_…>`);
-	lines.push(`To correct it later: agents-dailies devlog edit ${id} --title/--summary/--before/--after … --reason "…"`);
+	if (!before.length && !after.length) lines.push(`No before/after pair. If the change can be seen or heard, add both: kustomad devlog edit ${id} --before <file|i_…> --after <file|i_…>`);
+	else if (!before.length || !after.length) lines.push(`Only ${before.length ? "a before" : "an after"}: add the other if it can be captured: kustomad devlog edit ${id} --${before.length ? "after" : "before"} <file|i_…>`);
+	lines.push(`To correct it later: kustomad devlog edit ${id} --title/--summary/--before/--after … --reason "…"`);
 	print(lines.join("\n"));
 }
 
 async function devlogEdit(argv: string[]): Promise<void> {
 	const args = parseDevlog(argv, ["--title", "--summary", "--craft", "--struggle", "--decided", "--issue", "--reason"], ["--no-before", "--no-after", "--json"]);
 	const [id, ...stray] = args.positional;
-	if (!id) fail("which entry? agents-dailies devlog edit <p_…> (devlog list shows the ids)");
+	if (!id) fail("which entry? kustomad devlog edit <p_…> (devlog list shows the ids)");
 	if (stray.length) fail("files go after --before or --after");
 	if (args.before && args.flags.has("--no-before")) fail("--before and --no-before cannot go together");
 	if (args.after && args.flags.has("--no-after")) fail("--after and --no-after cannot go together");
@@ -692,7 +692,7 @@ async function devlogEdit(argv: string[]): Promise<void> {
 	const catalog = target.load();
 	const entry = catalog.post(postIdFrom(id));
 	if (!entry || entry.kind !== "devlog") fail(`no devlog entry ${postIdFrom(id)}`);
-	if (entry.retracted) fail(`${entry.id} is retracted; bring it back first (agents-dailies devlog retract ${entry.id} --undo)`);
+	if (entry.retracted) fail(`${entry.id} is retracted; bring it back first (kustomad devlog retract ${entry.id} --undo)`);
 	const sections = sectionsFrom(args);
 	const change: DevlogChange = {};
 	for (const name of ["summary", "craft", "struggle", "decided"] as const) if (sections[name] !== undefined) change[name] = sections[name];
@@ -732,13 +732,13 @@ async function devlogEdit(argv: string[]): Promise<void> {
 async function devlogRetract(argv: string[]): Promise<void> {
 	const args = parse(argv, { flags: ["--undo", "--json"], values: ["--reason"] });
 	const id = args.positional[0];
-	if (!id) fail("which entry? agents-dailies devlog retract <p_…>");
+	if (!id) fail("which entry? kustomad devlog retract <p_…>");
 	const target = store();
 	const base = await ensureViewer(target, env);
 	const undo = args.flags.has("--undo");
 	const result = await write<{ post: PostView; retract: RetractEvent }>(target, base, "/api/retract", { post: id, reason: args.values.get("--reason"), undo, session: env.CLAUDE_CODE_SESSION_ID, by: "agent" });
 	if (args.flags.has("--json")) return json(result);
-	print(undo ? `Brought back the devlog entry ${result.post.id} ("${result.post.title ?? ""}").` : `Retracted the devlog entry ${result.post.id} ("${result.post.title ?? ""}"). It stays in the store; agents-dailies devlog retract ${result.post.id} --undo brings it back.`);
+	print(undo ? `Brought back the devlog entry ${result.post.id} ("${result.post.title ?? ""}").` : `Retracted the devlog entry ${result.post.id} ("${result.post.title ?? ""}"). It stays in the store; kustomad devlog retract ${result.post.id} --undo brings it back.`);
 }
 
 async function devlogList(argv: string[]): Promise<void> {
@@ -785,7 +785,7 @@ async function devlog(argv: string[]): Promise<void> {
 		case "sweep":
 			return devlogSweep();
 		default:
-			fail("agents-dailies devlog <add|edit|retract|list|summary|sweep> …");
+			fail("kustomad devlog <add|edit|retract|list|summary|sweep> …");
 	}
 }
 
@@ -796,7 +796,7 @@ async function serve(argv: string[]): Promise<void> {
 	const target = store();
 	const server = new DailiesServer(target, { host: args.values.get("--host") ?? viewerHost(env), onShutdown: () => process.exit(0) });
 	await server.listen(Number(args.values.get("--port")) || viewerPort(env));
-	console.log(`${new Date().toISOString()} agents-dailies ${version()} serving ${target.home} at ${server.url}`);
+	console.log(`${new Date().toISOString()} kustomad ${version()} serving ${target.home} at ${server.url}`);
 	const quit = () => void server.close().then(() => process.exit(0));
 	process.on("SIGTERM", quit);
 	process.on("SIGINT", quit);
@@ -807,7 +807,7 @@ async function open(): Promise<void> {
 	const base = await ensureViewer(target, env);
 	if (!base) fail(`the viewer could not start; see ${join(target.home, "server.log")}`);
 	const url = `${base}/`;
-	if (!openBrowser(url, { ...env, AGENTS_DAILIES_NO_OPEN: undefined })) print(`Open ${url}`);
+	if (!openBrowser(url, { ...env, KUSTOMAD_NO_OPEN: undefined })) print(`Open ${url}`);
 	else print(`Opened ${url}`);
 }
 
@@ -873,7 +873,7 @@ async function hook(argv: string[]): Promise<void> {
 				result = sessionEnd(input, context);
 				break;
 			default:
-				fail("agents-dailies hook <pre-tool-use|session-start|user-prompt-submit|stop|session-end>");
+				fail("kustomad hook <pre-tool-use|session-start|user-prompt-submit|stop|session-end>");
 		}
 	} catch (error) {
 		if (error instanceof UsageError) throw error;
@@ -888,43 +888,43 @@ async function hook(argv: string[]): Promise<void> {
 	if (result.context) print(result.context);
 }
 
-const HELP = `agents-dailies ${version()} — a live review page for what your coding agent makes
+const HELP = `KustomAD ${version()} — a live review page for what your coding agent makes
 
 Usage:
-  agents-dailies show <file>… [--title T] [--note N] [--tag X]… [--issue KEY] [--lane L] [--no-open] [--json]
+  kustomad show <file>… [--title T] [--note N] [--tag X]… [--issue KEY] [--lane L] [--no-open] [--json]
       Put files at the top of the viewer (images, videos, audio, GLB, PDF, HTML, Markdown, text).
       Starts the viewer if needed; opens the browser only when no viewer tab is open.
-  agents-dailies ask "<question>" [file…] [--pattern LABEL file…]… [--option TEXT]… [--about file]…
+  kustomad ask "<question>" [file…] [--pattern LABEL file…]… [--option TEXT]… [--about file]…
                     [--why TEXT] [--multi] [--wait] [--json]
-  agents-dailies ask --file sheet.json [--wait] [--json]
+  kustomad ask --file sheet.json [--wait] [--json]
       Ask the user to decide between things to look at: files, patterns and sentences become
       options A, B, C…; --about shows a file above the options (to sign off on one thing).
-  agents-dailies wait <post-id> [--timeout 110m]   Block until the post's questions are answered
-  agents-dailies watch [--session ID] [--timeout 110m]
+  kustomad wait <post-id> [--timeout 110m]   Block until the post's questions are answered
+  kustomad watch [--session ID] [--timeout 110m]
                                       Block until the user comments on this session's posts
-  agents-dailies context [--json]     What the user selected in the viewer (or the newest post)
-  agents-dailies feedback [--since 24h] [--all] [--json]
-  agents-dailies list [--limit N] [--all] [--json]
-  agents-dailies get <item-id|post-id:n> [--to PATH]
-  agents-dailies issue [KEY] [--refresh] [--title T] [--description TEXT|-] [--status S] [--url U] [--json]
-  agents-dailies devlog add --title T --summary - [--before file|i_…] [--after file|i_…] [--commits A..B|none] [--issue KEY]
-  agents-dailies devlog edit <p_…> [--title|--summary|--craft|--struggle|--decided|--before|--after|--no-before|--no-after|--issue] [--reason R]
-  agents-dailies devlog retract <p_…> [--reason R] [--undo]
-  agents-dailies devlog list [--all] | summary [--since 7d|ISO] [--until …] | sweep
-  agents-dailies open | status | stop | serve [--port P] [--host H]
-  agents-dailies guide                Instructions to give a coding agent (CLAUDE.md / AGENTS.md)
-  agents-dailies hook <pre-tool-use|session-start|user-prompt-submit|stop|session-end>
+  kustomad context [--json]     What the user selected in the viewer (or the newest post)
+  kustomad feedback [--since 24h] [--all] [--json]
+  kustomad list [--limit N] [--all] [--json]
+  kustomad get <item-id|post-id:n> [--to PATH]
+  kustomad issue [KEY] [--refresh] [--title T] [--description TEXT|-] [--status S] [--url U] [--json]
+  kustomad devlog add --title T --summary - [--before file|i_…] [--after file|i_…] [--commits A..B|none] [--issue KEY]
+  kustomad devlog edit <p_…> [--title|--summary|--craft|--struggle|--decided|--before|--after|--no-before|--no-after|--issue] [--reason R]
+  kustomad devlog retract <p_…> [--reason R] [--undo]
+  kustomad devlog list [--all] | summary [--since 7d|ISO] [--until …] | sweep
+  kustomad open | status | stop | serve [--port P] [--host H]
+  kustomad guide                Instructions to give a coding agent (CLAUDE.md / AGENTS.md)
+  kustomad hook <pre-tool-use|session-start|user-prompt-submit|stop|session-end>
 
 Environment:
-  AGENTS_DAILIES_HOME      store (default $XDG_DATA_HOME/agents-dailies)
-  AGENTS_DAILIES_PORT      viewer port (default 4778)
-  AGENTS_DAILIES_HOST      address to listen on (default 127.0.0.1)
-  AGENTS_DAILIES_NO_OPEN=1 never open a browser from show
-  AGENTS_DAILIES_BROWSER   command to open URLs with
-  AGENTS_DAILIES_AUTO_WATCH=0  no Stop-hook reminder to wait on an unanswered question
-  AGENTS_DAILIES_DEVLOG=0      no Stop-hook devlog suggestion after a merge
-  AGENTS_DAILIES_ISSUE_COMMAND command printing an issue as JSON ({key} is replaced)
-  AGENTS_DAILIES_CONFIG        config file (default $XDG_CONFIG_HOME/agents-dailies/config.json)
+  KUSTOMAD_HOME      store (default $XDG_DATA_HOME/kustomad)
+  KUSTOMAD_PORT      viewer port (default 4778)
+  KUSTOMAD_HOST      address to listen on (default 127.0.0.1)
+  KUSTOMAD_NO_OPEN=1 never open a browser from show
+  KUSTOMAD_BROWSER   command to open URLs with
+  KUSTOMAD_AUTO_WATCH=0  no Stop-hook reminder to wait on an unanswered question
+  KUSTOMAD_DEVLOG=0      no Stop-hook devlog suggestion after a merge
+  KUSTOMAD_ISSUE_COMMAND command printing an issue as JSON ({key} is replaced)
+  KUSTOMAD_CONFIG        config file (default $XDG_CONFIG_HOME/kustomad/config.json)
 `;
 
 async function main(argv: string[]): Promise<void> {
@@ -972,15 +972,15 @@ async function main(argv: string[]): Promise<void> {
 		case "-h":
 			return print(HELP);
 		default:
-			fail(`unknown command ${command}; agents-dailies --help`);
+			fail(`unknown command ${command}; kustomad --help`);
 	}
 }
 
 main(process.argv.slice(2)).catch((error: unknown) => {
 	if (error instanceof UsageError || error instanceof ApiError) {
-		process.stderr.write(`agents-dailies: ${error.message}\n`);
+		process.stderr.write(`kustomad: ${error.message}\n`);
 	} else {
-		process.stderr.write(`agents-dailies: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`);
+		process.stderr.write(`kustomad: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`);
 	}
 	process.exitCode = 1;
 });

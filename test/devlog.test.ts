@@ -19,12 +19,12 @@ git("commit", "-q", "--allow-empty", "-m", "start");
 const env = {
 	...process.env,
 	...gitEnv,
-	AGENTS_DAILIES_HOME: join(dir, "home"),
-	AGENTS_DAILIES_PORT: String(49000 + Math.floor(Math.random() * 900)),
-	AGENTS_DAILIES_NO_OPEN: "1",
+	KUSTOMAD_HOME: join(dir, "home"),
+	KUSTOMAD_PORT: String(49000 + Math.floor(Math.random() * 900)),
+	KUSTOMAD_NO_OPEN: "1",
 	CLAUDE_CODE_SESSION_ID: "dev-session",
 	CLAUDE_CONFIG_DIR: join(dir, "claude"),
-	AGENTS_DAILIES_AUTO_WATCH: "0",
+	KUSTOMAD_AUTO_WATCH: "0",
 };
 const run = (args: string[], input?: string) =>
 	new Promise<{ code: number; stdout: string; stderr: string }>((resolve) => {
@@ -144,8 +144,8 @@ test("an entry without craft, struggle or before/after is recorded with a nudge"
 	assert.equal(result.code, 0, result.stderr);
 	assert.match(result.stdout, /No craft \(工夫\) or struggle \(苦労\) written/);
 	assert.match(result.stdout, /No before\/after pair/);
-	assert.match(result.stdout, /add both: agents-dailies devlog edit p_[a-z0-9]+ --before/);
-	assert.match(result.stdout, /To correct it later: agents-dailies devlog edit p_[a-z0-9]+ /);
+	assert.match(result.stdout, /add both: kustomad devlog edit p_[a-z0-9]+ --before/);
+	assert.match(result.stdout, /To correct it later: kustomad devlog edit p_[a-z0-9]+ /);
 });
 
 test("a recorded entry is corrected and retracted from the command line, and nothing is deleted", async () => {

@@ -1,9 +1,9 @@
-# agents-dailies
+# KustomAD
 
 **コーディングエージェントが作ったものを見るための、ライブのレビューページ。** [English](README.md)
 
 エージェントが画像をレンダリングしたり、動画を撮ったり、音や 3D モデルを書き出したりすると、
-新しいウィンドウが開いたり、worktree の奥のパスだけが残されたりしがちです。agents-dailies は
+新しいウィンドウが開いたり、worktree の奥のパスだけが残されたりしがちです。KustomAD は
 その置き場所をひとつにします。開きっぱなしのブラウザタブに、作られたものが上から順に、
 候補と横並びで、その場で現れて残ります。
 
@@ -30,17 +30,17 @@
 Node.js 22.6 以上が `PATH` にあれば OK。npm install もビルドも不要です。
 
 ```sh
-git clone https://github.com/KustomApe/agents-dailies.git ~/.local/share/agents-dailies-src
+git clone https://github.com/KustomApe/kustomad.git ~/.local/share/kustomad-src
 mkdir -p ~/.local/bin
-ln -s ~/.local/share/agents-dailies-src/bin/agents-dailies ~/.local/bin/   # ~/.local/bin を PATH に
-agents-dailies guide >> CLAUDE.md   # エージェントへの説明（AGENTS.md などでも可）
+ln -s ~/.local/share/kustomad-src/bin/kustomad ~/.local/bin/   # ~/.local/bin を PATH に
+kustomad guide >> CLAUDE.md   # エージェントへの説明（AGENTS.md などでも可）
 ```
 
 ### Claude Code プラグインとして（任意）
 
 ```text
-/plugin marketplace add KustomApe/agents-dailies
-/plugin install agents-dailies@agents-dailies
+/plugin marketplace add KustomApe/kustomad
+/plugin install kustomad@kustomad
 ```
 
 新しいセッションから、`bin/` の PATH 追加・スキル・フック（メディアをウィンドウで開くのを止める、返事をエージェントに渡す、マージ後の devlog 記録を促す等）が有効になります。インストールしなくても CLI とビューアはそのまま使えます。
@@ -51,31 +51,32 @@ agents-dailies guide >> CLAUDE.md   # エージェントへの説明（AGENTS.md
 
 | コマンド | 内容 |
 | --- | --- |
-| `agents-dailies open` | 必要なら起動して、ブラウザで開く |
-| `agents-dailies status` | 動作状況・アドレス・開いているタブ数・保存場所 |
-| `agents-dailies serve` | フォアグラウンドで起動（Ctrl-C で停止） |
-| `agents-dailies stop` | バックグラウンドのビューアを停止 |
+| `kustomad open` | 必要なら起動して、ブラウザで開く |
+| `kustomad status` | 動作状況・アドレス・開いているタブ数・保存場所 |
+| `kustomad serve` | フォアグラウンドで起動（Ctrl-C で停止） |
+| `kustomad stop` | バックグラウンドのビューアを停止 |
 
-ログは `~/.local/share/agents-dailies/server.log`。ポート変更は `AGENTS_DAILIES_PORT=4800`。
+ログは `~/.local/share/kustomad/server.log`。ポート変更は `KUSTOMAD_PORT=4800`。
+旧名 agents-dailies のデータ・設定フォルダは、`kustomad/` が無いあいだはそのまま使われます。
 
 ## 使い方
 
 ```sh
-agents-dailies show a.png b.png --title "ライティング A / B" --note "B はフィルライトを下げた"
-agents-dailies ask "正面図はどれを残す？" a.png b.png --option "どれも違う — 描き直し"
-agents-dailies ask "このカットで出す？" --about cut.mp4 --option "OK" --option "直したい所がある"
-agents-dailies wait <post-id>     # バックグラウンドで。回答が来たら終了
-agents-dailies context            # 「これ」— ビューアで選択中のもの
-agents-dailies devlog add --title "マントが厚くなった" --before old.png --after new.png --summary - <<'EOF'
+kustomad show a.png b.png --title "ライティング A / B" --note "B はフィルライトを下げた"
+kustomad ask "正面図はどれを残す？" a.png b.png --option "どれも違う — 描き直し"
+kustomad ask "このカットで出す？" --about cut.mp4 --option "OK" --option "直したい所がある"
+kustomad wait <post-id>     # バックグラウンドで。回答が来たら終了
+kustomad context            # 「これ」— ビューアで選択中のもの
+kustomad devlog add --title "マントが厚くなった" --before old.png --after new.png --summary - <<'EOF'
 変更点と理由。
 ## 工夫
 ## 苦労
 ## 決めたこと
 EOF
-agents-dailies devlog summary --since "2026-10-01 18:00"
+kustomad devlog summary --since "2026-10-01 18:00"
 ```
 
-詳しいコマンド・保存場所・環境変数（`AGENTS_DAILIES_*`）・セキュリティは [README.md](README.md) を参照してください。
+詳しいコマンド・保存場所・環境変数（`KUSTOMAD_*`）・セキュリティは [README.md](README.md) を参照してください。
 
 ## ライセンス
 

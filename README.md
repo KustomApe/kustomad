@@ -1,10 +1,10 @@
-# agents-dailies
+# KustomAD
 
 **A live review page for what your coding agent makes.** [日本語](README.ja.md)
 
 When an agent renders an image, records a clip, generates a sound or exports a 3D
 model, it tends to pop open a window or leave you a path deep inside a worktree.
-agents-dailies gives it one place to put things instead: a browser tab you keep open,
+KustomAD gives it one place to put things instead: a browser tab you keep open,
 where every result appears at the top as it is made, side by side with the
 alternatives, and stays.
 
@@ -52,18 +52,18 @@ Needs [Node.js](https://nodejs.org/) 22.6+ on `PATH`. No npm install, no build.
 ### From a clone (any shell or agent)
 
 ```sh
-git clone https://github.com/KustomApe/agents-dailies.git ~/.local/share/agents-dailies-src
+git clone https://github.com/KustomApe/kustomad.git ~/.local/share/kustomad-src
 mkdir -p ~/.local/bin
-ln -s ~/.local/share/agents-dailies-src/bin/agents-dailies ~/.local/bin/   # ~/.local/bin must be on PATH
-agents-dailies --version
-agents-dailies guide   # instructions to paste into your agent's CLAUDE.md / AGENTS.md
+ln -s ~/.local/share/kustomad-src/bin/kustomad ~/.local/bin/   # ~/.local/bin must be on PATH
+kustomad --version
+kustomad guide   # instructions to paste into your agent's CLAUDE.md / AGENTS.md
 ```
 
-`bin/agents-dailies` runs the TypeScript sources with Node directly, so a plain clone
+`bin/kustomad` runs the TypeScript sources with Node directly, so a plain clone
 works. To update, `git pull` in the clone (a running viewer is replaced by a newer
 version automatically).
 
-`agents-dailies hook <pre-tool-use|session-start|user-prompt-submit|stop|session-end>`
+`kustomad hook <pre-tool-use|session-start|user-prompt-submit|stop|session-end>`
 reads a Claude Code style hook event on stdin, for agents with hooks.
 
 ### As a Claude Code plugin (optional)
@@ -72,24 +72,24 @@ The repository is also a Claude Code plugin. Installing it is optional; everythi
 above works without it. In Claude Code:
 
 ```text
-/plugin marketplace add KustomApe/agents-dailies     # or a local path to the clone
-/plugin install agents-dailies@agents-dailies
+/plugin marketplace add KustomApe/kustomad     # or a local path to the clone
+/plugin install kustomad@kustomad
 ```
 
 Start a new session afterwards. The plugin then:
 
 - puts `bin/` on the agent's `PATH` at session start (via `$CLAUDE_ENV_FILE`), so the
-  agent can type `agents-dailies show …` with no symlink;
+  agent can type `kustomad show …` with no symlink;
 - adds a skill telling the agent when to `show`, `ask`, read `context` and write the devlog;
 - adds hooks: SessionStart (guide + unread replies, keeps transcripts), PreToolUse on
   Bash (stops `xdg-open`/`open`/image viewers/video players on media files in favour of
-  `agents-dailies show`; notes merges and commits for the devlog), Stop (hands over
+  `kustomad show`; notes merges and commits for the devlog), Stop (hands over
   replies, reminds once to `wait` on an unanswered question, suggests a devlog entry
   once after a merge lands), UserPromptSubmit (replies since you last heard) and
   SessionEnd (keeps the transcript).
 
 It installs nothing with npm and runs no server until the first `show`. Remove it with
-`/plugin uninstall agents-dailies@agents-dailies`.
+`/plugin uninstall kustomad@kustomad`.
 
 ## Getting started
 
@@ -99,21 +99,21 @@ You do not need to start anything: the first `show` or `ask` starts the viewer i
 background and opens the browser if no viewer tab is open.
 
 ```sh
-agents-dailies show screenshot.png --title "First look"   # starts the viewer, opens http://127.0.0.1:4778/
+kustomad show screenshot.png --title "First look"   # starts the viewer, opens http://127.0.0.1:4778/
 ```
 
 To control it yourself:
 
 | Command | What it does |
 | --- | --- |
-| `agents-dailies open` | Start the viewer if needed and open it in the browser |
-| `agents-dailies status` | Whether it runs, its address, version, open tabs and the store location |
-| `agents-dailies serve [--port P] [--host H]` | Run it in the foreground (logs to the terminal; Ctrl-C stops it) |
-| `agents-dailies stop` | Stop the background viewer |
+| `kustomad open` | Start the viewer if needed and open it in the browser |
+| `kustomad status` | Whether it runs, its address, version, open tabs and the store location |
+| `kustomad serve [--port P] [--host H]` | Run it in the foreground (logs to the terminal; Ctrl-C stops it) |
+| `kustomad stop` | Stop the background viewer |
 
-The background viewer logs to `~/.local/share/agents-dailies/server.log`. Another port:
-`AGENTS_DAILIES_PORT=4800 agents-dailies open`. To see the viewer from another machine
-(e.g. over Tailscale): `AGENTS_DAILIES_HOST=0.0.0.0 agents-dailies serve` — only on a
+The background viewer logs to `~/.local/share/kustomad/server.log`. Another port:
+`KUSTOMAD_PORT=4800 kustomad open`. To see the viewer from another machine
+(e.g. over Tailscale): `KUSTOMAD_HOST=0.0.0.0 kustomad serve` — only on a
 network you trust.
 
 ### Tell your agent about it
@@ -121,7 +121,7 @@ network you trust.
 Without the plugin, give the agent the instructions once:
 
 ```sh
-agents-dailies guide >> CLAUDE.md     # or AGENTS.md, or your agent's instructions file
+kustomad guide >> CLAUDE.md     # or AGENTS.md, or your agent's instructions file
 ```
 
 From then on, ask it things like "show me the renders", "which of these looks better?"
@@ -131,17 +131,17 @@ or "record the devlog for this merge", and keep the viewer tab open. Reply on th
 ### Try it with a scratch store
 
 ```sh
-export AGENTS_DAILIES_HOME=$(mktemp -d) AGENTS_DAILIES_PORT=47901
-agents-dailies show a.png b.png --title "A / B"
-agents-dailies ask "Which one?" a.png b.png --option "Neither"
-agents-dailies wait <post-id>        # answer in the page; this prints your answer
-agents-dailies stop
+export KUSTOMAD_HOME=$(mktemp -d) KUSTOMAD_PORT=47901
+kustomad show a.png b.png --title "A / B"
+kustomad ask "Which one?" a.png b.png --option "Neither"
+kustomad wait <post-id>        # answer in the page; this prints your answer
+kustomad stop
 ```
 
 ## Use
 
 ```sh
-agents-dailies show render_a.png render_b.png --title "Lighting: A / B" --note "B lowers the fill light"
+kustomad show render_a.png render_b.png --title "Lighting: A / B" --note "B lowers the fill light"
 ```
 
 ```text
@@ -154,11 +154,11 @@ The viewer is open in 1 tab; it updated in place. No need to open anything.
 When it needs a decision:
 
 ```sh
-agents-dailies ask "Which front view do we keep?" a.png b.png --option "Neither — redraw it" --why "B matches the back view."
-agents-dailies ask "Which palette?" --pattern "Current" c1.png c2.png --pattern "Warmer" w1.png w2.png
-agents-dailies ask "Ship this cut?" --about cut.mp4 --option "OK" --option "Fix something"
-agents-dailies ask --file review.json     # several questions (format: skills/agents-dailies/SKILL.md)
-agents-dailies wait <post-id>             # in the background: exits with the answers
+kustomad ask "Which front view do we keep?" a.png b.png --option "Neither — redraw it" --why "B matches the back view."
+kustomad ask "Which palette?" --pattern "Current" c1.png c2.png --pattern "Warmer" w1.png w2.png
+kustomad ask "Ship this cut?" --about cut.mp4 --option "OK" --option "Fix something"
+kustomad ask --file review.json     # several questions (format: skills/kustomad/SKILL.md)
+kustomad wait <post-id>             # in the background: exits with the answers
 ```
 
 | Command | What it gives the agent |
@@ -186,7 +186,7 @@ For you: `open`, `status`, `stop`, `serve`.
 Every post remembers the session that made it (`CLAUDE_CODE_SESSION_ID`). A reply is
 pending for that session until it has been handed over once:
 
-1. **While idle** — `agents-dailies watch` (or `wait`) runs in the background; Claude
+1. **While idle** — `kustomad watch` (or `wait`) runs in the background; Claude
    Code wakes the agent when it exits with your reply.
 2. **Before it stops** — the Stop hook hands over unread replies and, once per
    unanswered question, reminds the agent to start `wait`.
@@ -197,7 +197,7 @@ pending for that session until it has been handed over once:
 ### Devlog
 
 ```sh
-agents-dailies devlog add --title "What changed" --before old.png --after new.png --summary - <<'EOF'
+kustomad devlog add --title "What changed" --before old.png --after new.png --summary - <<'EOF'
 What changed for the people using it, and why.
 ## 工夫
 What worked.
@@ -206,9 +206,9 @@ What was hard: what failed first, what was tried.
 ## 決めたこと
 What was decided.
 EOF
-agents-dailies devlog edit <p_…> --before right.png --reason "wrong commit"   # corrections are new events
-agents-dailies devlog retract <p_…> [--undo]
-agents-dailies devlog summary --since "2026-10-01 18:00"
+kustomad devlog edit <p_…> --before right.png --reason "wrong commit"   # corrections are new events
+kustomad devlog retract <p_…> [--undo]
+kustomad devlog summary --since "2026-10-01 18:00"
 ```
 
 The PreToolUse hook notes merges a session runs (and commits made straight on the main
@@ -219,8 +219,8 @@ entry once after a merge lands. Transcripts are kept at session start and end
 
 ### Issue summaries
 
-agents-dailies talks to no tracker itself. Name a command that prints an issue as JSON
-in `$XDG_CONFIG_HOME/agents-dailies/config.json` (`{key}` is replaced):
+kustomad talks to no tracker itself. Name a command that prints an issue as JSON
+in `$XDG_CONFIG_HOME/kustomad/config.json` (`{key}` is replaced):
 
 ```json
 {
@@ -231,12 +231,12 @@ in `$XDG_CONFIG_HOME/agents-dailies/config.json` (`{key}` is replaced):
 
 It runs in the background at most every 30 minutes per issue. Linear, GitHub and
 Jira-like JSON are understood. Only your own config is read — a repository cannot make
-agents-dailies run commands. Without one: `agents-dailies issue KEY --title … --description -`.
+KustomAD run commands. Without one: `kustomad issue KEY --title … --description -`.
 
 ## Where things are kept
 
 ```text
-$XDG_DATA_HOME/agents-dailies/           (~/.local/share/agents-dailies)
+$XDG_DATA_HOME/kustomad/           (~/.local/share/kustomad)
   blobs/<ab>/<sha256><ext>               each file once per content
   log/<machine>.jsonl                    append-only events: post, comment, answer, verdict, issue, amend, retract
   named/<item>/<original name>           hard links under the original names (copy path / drag)
@@ -247,18 +247,21 @@ $XDG_DATA_HOME/agents-dailies/           (~/.local/share/agents-dailies)
   server.log
 ```
 
+KustomAD used to be called agents-dailies: while `kustomad/` does not exist yet, an existing
+`agents-dailies/` data or config folder is used as is.
+
 | Variable | Default |
 | --- | --- |
-| `AGENTS_DAILIES_HOME` | `$XDG_DATA_HOME/agents-dailies` |
-| `AGENTS_DAILIES_PORT` | `4778` |
-| `AGENTS_DAILIES_HOST` | `127.0.0.1` (`0.0.0.0` to reach it from other machines on a trusted network) |
-| `AGENTS_DAILIES_NO_OPEN=1` | never open a browser from `show` |
-| `AGENTS_DAILIES_BROWSER` | command to open URLs with |
-| `AGENTS_DAILIES_AUTO_WATCH=0` | no Stop-hook reminder to `wait` on an unanswered question |
-| `AGENTS_DAILIES_DEVLOG=0` | no Stop-hook devlog suggestion |
-| `AGENTS_DAILIES_ISSUE_COMMAND` | the issue command, overriding the config file |
-| `AGENTS_DAILIES_CONFIG` | another config file |
-| `AGENTS_DAILIES_MACHINE` | this machine's log name (default: host name) |
+| `KUSTOMAD_HOME` | `$XDG_DATA_HOME/kustomad` |
+| `KUSTOMAD_PORT` | `4778` |
+| `KUSTOMAD_HOST` | `127.0.0.1` (`0.0.0.0` to reach it from other machines on a trusted network) |
+| `KUSTOMAD_NO_OPEN=1` | never open a browser from `show` |
+| `KUSTOMAD_BROWSER` | command to open URLs with |
+| `KUSTOMAD_AUTO_WATCH=0` | no Stop-hook reminder to `wait` on an unanswered question |
+| `KUSTOMAD_DEVLOG=0` | no Stop-hook devlog suggestion |
+| `KUSTOMAD_ISSUE_COMMAND` | the issue command, overriding the config file |
+| `KUSTOMAD_CONFIG` | another config file |
+| `KUSTOMAD_MACHINE` | this machine's log name (default: host name) |
 
 ## Security
 
@@ -273,7 +276,7 @@ Listening on `0.0.0.0` turns the `Host` check off — only on a network you trus
 npm run setup     # TypeScript and types into dev/; the tool itself has no dependencies
 npm test          # node --test; Node runs the TypeScript directly
 npm run verify    # typecheck + test + build
-bin/agents-dailies show some.png
+bin/kustomad show some.png
 ```
 
 See [AGENTS.md](AGENTS.md) for the layout and invariants, and [docs/API.md](docs/API.md)

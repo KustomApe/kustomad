@@ -115,12 +115,12 @@ export async function write<T>(store: Store, base: string | undefined, path: str
 }
 
 export function openBrowser(url: string, env: Env = process.env): boolean {
-	if (flagOn(env.AGENTS_DAILIES_NO_OPEN)) return false;
+	if (flagOn(env.KUSTOMAD_NO_OPEN)) return false;
 	let command: string;
 	let args: string[];
-	if (env.AGENTS_DAILIES_BROWSER) {
+	if (env.KUSTOMAD_BROWSER) {
 		command = "sh";
-		args = ["-c", `${env.AGENTS_DAILIES_BROWSER} "$1"`, "sh", url];
+		args = ["-c", `${env.KUSTOMAD_BROWSER} "$1"`, "sh", url];
 	} else if (process.platform === "darwin") {
 		command = "open";
 		args = [url];

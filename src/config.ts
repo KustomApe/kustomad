@@ -1,9 +1,11 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { homedir, hostname } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const NAME = "agents-dailies";
+export const NAME = "kustomad";
+/** The name before the rename: its folders are still used until the new ones exist. */
+const LEGACY_NAME = "agents-dailies";
 export const DEFAULT_PORT = 4778;
 
 /** The checkout this code runs from: the plugin root, or the package root. */
@@ -36,18 +38,25 @@ export function compareVersions(a: string, b: string): number {
 }
 
 export function storeHome(env: Env = process.env): string {
-	if (env.AGENTS_DAILIES_HOME) return env.AGENTS_DAILIES_HOME;
+	if (env.KUSTOMAD_HOME) return env.KUSTOMAD_HOME;
 	const data = env.XDG_DATA_HOME || join(homedir(), ".local", "share");
-	return join(data, NAME);
+	return named(data);
+}
+
+/** `<base>/kustomad`, or the folder from before the rename while only that one exists. */
+function named(base: string): string {
+	const current = join(base, NAME);
+	const legacy = join(base, LEGACY_NAME);
+	return !existsSync(current) && existsSync(legacy) ? legacy : current;
 }
 
 export function viewerPort(env: Env = process.env): number {
-	const port = Number(env.AGENTS_DAILIES_PORT);
+	const port = Number(env.KUSTOMAD_PORT);
 	return Number.isInteger(port) && port > 0 && port < 65536 ? port : DEFAULT_PORT;
 }
 
 export function viewerHost(env: Env = process.env): string {
-	return env.AGENTS_DAILIES_HOST || "127.0.0.1";
+	return env.KUSTOMAD_HOST || "127.0.0.1";
 }
 
 /** The address the CLI talks to: a wildcard bind is still reached on loopback. */
@@ -59,7 +68,7 @@ export function viewerUrl(env: Env = process.env): string {
 
 /** A short, file-name-safe name for this machine: each machine appends to its own log. */
 export function machineName(env: Env = process.env): string {
-	const name = (env.AGENTS_DAILIES_MACHINE || hostname() || "machine").toLowerCase().replace(/\.local$/, "");
+	const name = (env.KUSTOMAD_MACHINE || hostname() || "machine").toLowerCase().replace(/\.local$/, "");
 	return name.replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "") || "machine";
 }
 
@@ -77,9 +86,9 @@ export interface UserConfig {
 }
 
 export function configPath(env: Env = process.env): string {
-	if (env.AGENTS_DAILIES_CONFIG) return env.AGENTS_DAILIES_CONFIG;
+	if (env.KUSTOMAD_CONFIG) return env.KUSTOMAD_CONFIG;
 	const base = env.XDG_CONFIG_HOME || join(homedir(), ".config");
-	return join(base, NAME, "config.json");
+	return join(named(base), "config.json");
 }
 
 /** The user's own config. A repository never supplies one, so it cannot make us run commands. */

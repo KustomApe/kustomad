@@ -1,5 +1,5 @@
 #!/bin/sh
-# Runs agents-dailies from this checkout (the Claude Code plugin's copy or a clone) with
+# Runs kustomad from this checkout (the Claude Code plugin's copy or a clone) with
 # no install step: Node runs the TypeScript sources directly. Node 22.18+ / 23.6+ strip
 # types by default; 22.6–22.17 need the flag. A packed build (dist/ without src/) runs as is.
 
@@ -14,7 +14,7 @@ done
 root="$(cd "$(dirname "$self")/.." && pwd)"
 
 if ! command -v node >/dev/null 2>&1; then
-	echo "agents-dailies: needs Node.js 22.6 or later, and node is not on PATH" >&2
+	echo "kustomad: needs Node.js 22.6 or later, and node is not on PATH" >&2
 	exit 127
 fi
 
@@ -33,5 +33,5 @@ fi
 if { [ "$major" -eq 22 ] && [ "$minor" -ge 6 ]; } || [ "$major" -eq 23 ]; then
 	exec node --experimental-strip-types --no-warnings=ExperimentalWarning "$root/src/cli.ts" "$@"
 fi
-echo "agents-dailies: needs Node.js 22.6 or later (this is $v)" >&2
+echo "kustomad: needs Node.js 22.6 or later (this is $v)" >&2
 exit 1

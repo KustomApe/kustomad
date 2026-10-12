@@ -1,4 +1,4 @@
-// agents dailies — the viewer page. Plain JavaScript, no build step.
+// KustomAD — the viewer page. Plain JavaScript, no build step.
 // Talks to the viewer's JSON API (docs/API.md) and follows it live over server-sent events.
 (function () {
 	"use strict";
@@ -1222,7 +1222,7 @@
 		document.body.classList.toggle("is-loading", state.loading);
 		const search = $("#search");
 		if (document.activeElement !== search && search.value !== state.q) search.value = state.q;
-		document.title = open ? `(${open}) agents dailies` : "agents dailies";
+		document.title = open ? `(${open}) KustomAD` : "KustomAD";
 	}
 
 	function renderIssue() {
@@ -1251,7 +1251,7 @@
 
 	// ── Sidebar tree ────────────────────────────────────────────────────────
 
-	const SEEN_KEY = "agents-dailies:seen";
+	const SEEN_KEY = "kustomad:seen";
 	let seen = storageGet(SEEN_KEY, null);
 
 	function groupScope(group) {

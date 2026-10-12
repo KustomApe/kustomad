@@ -1,5 +1,5 @@
 {
-  "name": "agents-dailies",
+  "name": "kustomad",
   "version": "0.1.0",
   "description": "A live review page for what your coding agent makes: images, videos, audio and 3D models in one browser tab instead of windows, decisions made there, and replies brought back to the agent.",
   "keywords": ["claude-code", "coding-agent", "dailies", "review", "viewer", "assets", "gamedev"],
@@ -7,7 +7,7 @@
   "author": "AsK",
   "type": "module",
   "bin": {
-    "agents-dailies": "dist/cli.js"
+    "kustomad": "dist/cli.js"
   },
   "files": ["bin", "dist", "src", "web", "hooks", "skills", ".claude-plugin", "docs", "README.md", "README.ja.md", "LICENSE"],
   "engines": {

@@ -45,11 +45,11 @@ test("issues from Linear (linear-tui), GitHub (gh) and Jira-like JSON read the s
 test("the issue command comes from the user's config, per project or for all", () => {
 	const dir = tempDir();
 	const config = writeFile(dir, "config.json", JSON.stringify({ issueCommand: "gh issue view {key} --json title", projects: { game: { issueCommand: "linear-tui issue show {key} --json" } } }));
-	const env = { AGENTS_DAILIES_CONFIG: config };
+	const env = { KUSTOMAD_CONFIG: config };
 	assert.equal(issueCommandFor("game", env), "linear-tui issue show {key} --json");
 	assert.equal(issueCommandFor("other", env), "gh issue view {key} --json title");
-	assert.equal(issueCommandFor("game", { ...env, AGENTS_DAILIES_ISSUE_COMMAND: "x {key}" }), "x {key}");
-	assert.equal(issueCommandFor("game", { AGENTS_DAILIES_CONFIG: join(dir, "missing.json") }), undefined);
+	assert.equal(issueCommandFor("game", { ...env, KUSTOMAD_ISSUE_COMMAND: "x {key}" }), "x {key}");
+	assert.equal(issueCommandFor("game", { KUSTOMAD_CONFIG: join(dir, "missing.json") }), undefined);
 });
 
 test("fetching runs the command with the key and reads its JSON", async () => {

@@ -1,4 +1,4 @@
-# agents-dailies — notes for coding agents
+# KustomAD — notes for coding agents
 
 ## Commands
 
@@ -7,12 +7,12 @@ npm run setup      # dev tooling into dev/ (the tool itself needs nothing)
 npm test           # node --test over test/**/*.test.ts (Node runs the TypeScript directly)
 npm run typecheck
 npm run verify     # typecheck + test + build; run before every commit
-bin/agents-dailies …   # the CLI from source (what the plugin runs)
+bin/kustomad …   # the CLI from source (what the plugin runs)
 claude plugin validate .
 ```
 
 Point manual runs at a scratch store so they never touch the real one:
-`AGENTS_DAILIES_HOME=$(mktemp -d) AGENTS_DAILIES_PORT=47901 AGENTS_DAILIES_NO_OPEN=1 bin/agents-dailies show x.png`.
+`KUSTOMAD_HOME=$(mktemp -d) KUSTOMAD_PORT=47901 KUSTOMAD_NO_OPEN=1 bin/kustomad show x.png`.
 
 ## Layout
 
@@ -27,7 +27,7 @@ Point manual runs at a scratch store so they never touch the real one:
 - `web/` — the page: plain HTML, CSS and JavaScript, no build. Strings in `web/i18n.js` (English
   and Japanese). `web/vendor/` — model-viewer, vendored with its licenses.
 - The repository root is the Claude Code plugin: `.claude-plugin/`, `hooks/` (`hooks.json`,
-  `run.sh`), `skills/agents-dailies/SKILL.md`. `bin/agents-dailies` runs `src/cli.ts` with Node.
+  `run.sh`), `skills/kustomad/SKILL.md`. `bin/kustomad` runs `src/cli.ts` with Node.
 
 ## Invariants
 

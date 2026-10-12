@@ -77,64 +77,64 @@ export function openedMedia(command: string): string[] {
 export function preToolUse(input: HookInput | undefined): HookResult {
 	if (!input || input.tool_name !== "Bash") return PASS;
 	const command = String(input.tool_input?.command ?? "");
-	if (!command || /\bAGENTS_DAILIES_ALLOW_OPEN=1\b/.test(command)) return PASS;
+	if (!command || /\bKUSTOMAD_ALLOW_OPEN=1\b/.test(command)) return PASS;
 	const files = openedMedia(command);
 	if (!files.length) return PASS;
-	const show = `agents-dailies show ${files.map(shellQuote).join(" ")} --title "<what to look at>"`;
+	const show = `kustomad show ${files.map(shellQuote).join(" ")} --title "<what to look at>"`;
 	return {
 		block: true,
 		message: [
-			"Do not open media in a window: the user reviews it in the agents-dailies viewer (one browser tab they keep open). Run instead:",
+			"Do not open media in a window: the user reviews it in the KustomAD viewer (one browser tab they keep open). Run instead:",
 			`  ${show}`,
 			"It shows the files at the top of the viewer, live; the browser opens only if no viewer tab is open.",
-			"(If the user explicitly asked for a window, prefix the command with AGENTS_DAILIES_ALLOW_OPEN=1.)",
+			"(If the user explicitly asked for a window, prefix the command with KUSTOMAD_ALLOW_OPEN=1.)",
 		].join("\n"),
 	};
 }
 
 export function guide(): string {
-	return `agents-dailies is installed: the user reviews what you make in one browser tab (the
+	return `KustomAD is installed: the user reviews what you make in one browser tab (the
 viewer), replies there (OK, or a note) and answers your questions there. Use it for
 work in progress instead of opening files in windows, leaving the user file paths,
 or publishing an Artifact.
 
 Show — whenever you want the user to look at an image, video, GIF, audio clip, 3D
 model (GLB/glTF), PDF, HTML, Markdown or text file:
-- \`agents-dailies show <file>… --title "<what to look at>" [--note "<what changed>"]\`
+- \`kustomad show <file>… --title "<what to look at>" [--note "<what changed>"]\`
   Put alternatives in one call so they sit side by side. The browser opens only when
   no viewer tab is open; do not open anything else.
 
 Ask — only when the user must look at something to answer (pick between renders,
 clips, models or pages you made; sign off on how something looks):
-- \`agents-dailies ask "<question>" a.png b.png --option "Neither — redo it" --why "<your pick and why>"\`
+- \`kustomad ask "<question>" a.png b.png --option "Neither — redo it" --why "<your pick and why>"\`
   Files and --option texts become options A, B, C… (--multi: pick several).
-- Sign off on one thing: \`agents-dailies ask "Ship this cut?" --about cut.mp4 --option "OK" --option "Fix something"\`
+- Sign off on one thing: \`kustomad ask "Ship this cut?" --about cut.mp4 --option "OK" --option "Fix something"\`
   (a single file next to sentences is refused as option A — use --about).
 - A pattern made of several files: \`--pattern "Current" a1.png a2.png --pattern "Warmer" b1.png b2.png\`.
-- Several decisions at once: \`agents-dailies ask --file sheet.json\` with
+- Several decisions at once: \`kustomad ask --file sheet.json\` with
   {"title": "…", "questions": [{"text": "…", "why": "…", "files": [...], "options": ["OK", {"label": "…", "body": "…", "files": [...]}, "Let's discuss"]}]}.
-- Then start \`agents-dailies wait <post-id>\` in the background (Bash run_in_background,
+- Then start \`kustomad wait <post-id>\` in the background (Bash run_in_background,
   timeout 7200000). It exits with the answers (or a comment), which wakes you.
 - Questions answered from words alone (which approach, yes/no, a name) stay in the terminal.
 
 Hear back:
-- \`agents-dailies context\` — what the user selected ("this one", "これ") or the newest post.
-- \`agents-dailies watch\` in the background — exits when the user comments on this session's posts.
-- \`agents-dailies feedback [--since 2h]\`, \`agents-dailies list\`, \`agents-dailies get <item-id>\`.
+- \`kustomad context\` — what the user selected ("this one", "これ") or the newest post.
+- \`kustomad watch\` in the background — exits when the user comments on this session's posts.
+- \`kustomad feedback [--since 2h]\`, \`kustomad list\`, \`kustomad get <item-id>\`.
 
 Devlog — only merged work: after work lands on the main branch, if it changed something
 a person using the product would notice, record it:
-\`agents-dailies devlog add --title "<what changed>" --before <file|i_…> --after <file|i_…> --summary -\`
+\`kustomad devlog add --title "<what changed>" --before <file|i_…> --after <file|i_…> --summary -\`
 with stdin: what changed and why, then "## 工夫" (what worked), "## 苦労" (what was hard),
 "## 決めたこと" (decisions). Before/after are required when the change can be seen or
 heard (short videos for motion, timing or sound). Fix a wrong entry with
-\`agents-dailies devlog edit <p_…> … --reason "…"\` or \`agents-dailies devlog retract <p_…>\`.
-For an update since the last one: \`agents-dailies devlog summary --since "<when it ended>"\`.
+\`kustomad devlog edit <p_…> … --reason "…"\` or \`kustomad devlog retract <p_…>\`.
+For an update since the last one: \`kustomad devlog summary --since "<when it ended>"\`.
 `;
 }
 
 function sessionOf(input: HookInput | undefined, env: Record<string, string | undefined>): string | undefined {
-	return input?.session_id || env.CLAUDE_CODE_SESSION_ID || env.AGENTS_DAILIES_SESSION || undefined;
+	return input?.session_id || env.CLAUDE_CODE_SESSION_ID || env.KUSTOMAD_SESSION || undefined;
 }
 
 export interface HookContext {
@@ -184,7 +184,7 @@ export function userPromptSubmit(input: HookInput | undefined, context: HookCont
 	const pending = pendingFor(catalog, context.store, session);
 	if (!pending.length) return PASS;
 	markDelivered(context.store, session, pending);
-	return { block: false, context: `From the agents-dailies viewer since you last heard:\n${describeFeedback(catalog, pending).map((line) => `- ${line}`).join("\n")}` };
+	return { block: false, context: `From the kustomad viewer since you last heard:\n${describeFeedback(catalog, pending).map((line) => `- ${line}`).join("\n")}` };
 }
 
 export function preToolUseHook(input: HookInput | undefined, context: HookContext): HookResult {
@@ -217,12 +217,12 @@ export async function stop(input: HookInput | undefined, context: HookContext): 
 	const pending = pendingFor(catalog, store, session);
 	if (pending.length) {
 		markDelivered(store, session, pending);
-		if (hasMessage(pending)) parts.push(`The user replied in the agents-dailies viewer:\n${describeFeedback(catalog, pending).map((line) => `- ${line}`).join("\n")}\nAct on it before you stop.`);
+		if (hasMessage(pending)) parts.push(`The user replied in the KustomAD viewer:\n${describeFeedback(catalog, pending).map((line) => `- ${line}`).join("\n")}\nAct on it before you stop.`);
 	}
 
 	const state = store.readSession(session);
 	let changed = false;
-	if (!flagOff(env.AGENTS_DAILIES_AUTO_WATCH)) {
+	if (!flagOff(env.KUSTOMAD_AUTO_WATCH)) {
 		const reminded = new Set(state.reminded);
 		const waiting: string[] = [];
 		for (const post of catalog.posts) {
@@ -233,7 +233,7 @@ export async function stop(input: HookInput | undefined, context: HookContext): 
 			for (const question of open) state.reminded.push(`${post.id}/${question.id}`);
 			changed = true;
 			if (waiters) continue;
-			waiting.push(`- "${open[0]!.text}"${open.length > 1 ? ` (+${open.length - 1} more)` : ""}: agents-dailies wait ${post.id}`);
+			waiting.push(`- "${open[0]!.text}"${open.length > 1 ? ` (+${open.length - 1} more)` : ""}: kustomad wait ${post.id}`);
 		}
 		if (waiting.length) {
 			parts.push(
@@ -242,7 +242,7 @@ export async function stop(input: HookInput | undefined, context: HookContext): 
 		}
 	}
 
-	if (!flagOff(env.AGENTS_DAILIES_DEVLOG)) {
+	if (!flagOff(env.KUSTOMAD_DEVLOG)) {
 		const suggested = new Set(state.suggested ?? []);
 		const found = landings(state, catalog.recordedCommits()).filter((landing) => landing.keys.some((key) => !suggested.has(key)));
 		if (found.length) {
@@ -258,7 +258,7 @@ export async function stop(input: HookInput | undefined, context: HookContext): 
 					"Work from this session has landed on the main branch:",
 					...lines,
 					"If it changed something a person using the product would notice, record a devlog entry now (skip refactors nobody notices):",
-					'  agents-dailies devlog add --title "<what changed>" --before <file|i_…> --after <file|i_…> --summary - <<\'EOF\'',
+					'  kustomad devlog add --title "<what changed>" --before <file|i_…> --after <file|i_…> --summary - <<\'EOF\'',
 					"  What changed for the people using it, and why.",
 					"  ## 工夫",
 					"  What worked — the idea that made it work.",

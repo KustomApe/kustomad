@@ -1,8 +1,8 @@
 #!/bin/sh
-# Runs `agents-dailies hook <event>` from this plugin with the hook input on stdin.
+# Runs `kustomad hook <event>` from this plugin with the hook input on stdin.
 #
 # At session start it also puts the plugin's bin/ on the PATH of the agent's shell (through
-# $CLAUDE_ENV_FILE), so the agent can type `agents-dailies show …`. The Bash hook stays
+# $CLAUDE_ENV_FILE), so the agent can type `kustomad show …`. The Bash hook stays
 # cheap: commands that neither open a file nor merge/commit pass without starting Node.
 
 root="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
@@ -15,7 +15,7 @@ fi
 
 if ! command -v node >/dev/null 2>&1; then
 	if [ "$event" = "session-start" ]; then
-		echo "agents-dailies (a review page for what you make) is installed but needs Node.js 22.6+, and node is not on PATH; tell the user if they expect it."
+		echo "KustomAD (a review page for what you make) is installed but needs Node.js 22.6+, and node is not on PATH; tell the user if they expect it."
 	fi
 	exit 0
 fi
@@ -28,4 +28,4 @@ if [ "$event" = "pre-tool-use" ]; then
 	esac
 fi
 
-printf '%s' "$input" | exec sh "$root/bin/agents-dailies" hook "$event"
+printf '%s' "$input" | exec sh "$root/bin/kustomad" hook "$event"

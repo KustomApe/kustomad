@@ -56,7 +56,7 @@ export function gitInfo(cwd: string): GitInfo | undefined {
 
 /** Where a post made from `cwd` belongs: repository, worktree lane, branch, issue, session. */
 export function detectWhere(cwd: string, env: Record<string, string | undefined> = process.env): Where {
-	const session = env.AGENTS_DAILIES_SESSION || env.CLAUDE_CODE_SESSION_ID || env.CLAUDE_SESSION_ID || undefined;
+	const session = env.KUSTOMAD_SESSION || env.CLAUDE_CODE_SESSION_ID || env.CLAUDE_SESSION_ID || undefined;
 	const info = gitInfo(cwd);
 	if (!info) {
 		const name = basename(resolve(cwd)) || "home";

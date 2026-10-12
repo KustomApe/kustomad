@@ -96,7 +96,7 @@ test("the page loads the feed, the files, and ranges of them", async () => {
 	assert.equal(await part.text(), "world");
 
 	const page = await fetch(`${base}/`);
-	assert.match(await page.text(), /agents dailies/);
+	assert.match(await page.text(), /KustomAD/);
 	assert.equal((await fetch(`${base}/blob/${"0".repeat(64)}.png`)).status, 404);
 	assert.equal((await fetch(`${base}/../package.json`)).status, 404);
 });
