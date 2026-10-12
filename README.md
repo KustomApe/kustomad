@@ -35,6 +35,10 @@ renders and decides what to keep.
   records what changed, what worked (工夫), what was hard (苦労) and what was decided,
   with before/after images or videos. `devlog summary` gathers a period's entries,
   decisions, commits and Claude Code transcripts (kept before Claude Code deletes them).
+- **Idea board** — on its own tab (Ideas): ideas and things to build in columns
+  **Ideas → To build → Doing → Done** (and Dropped). Write them in the page, drag cards
+  or change their status; agents add and move them with `kustomad idea`. Per repository,
+  or for everything.
 - **The issue on screen** — above an issue's posts: title, status, description,
   fetched by a command you configure (Linear, GitHub, Jira…) or written by the agent.
 - **Take files with you** — copy an image to the clipboard, copy any file's path for an
@@ -216,6 +220,21 @@ branch); once they have landed, their commits and the merged branch's issue are
 attached, and `devlog add` refuses work still on a branch. The Stop hook suggests an
 entry once after a merge lands. Transcripts are kept at session start and end
 (`devlog sweep` by hand).
+
+### Idea board
+
+Write ideas and things to implement on the Ideas tab, or let the agent note them:
+
+```sh
+kustomad idea add "Frame stepping with , and ." --body "For checking timing" --status candidate
+kustomad idea add "Notify Slack when a question waits" --global   # not tied to this repository
+kustomad idea list [--status doing] [--all] [--everywhere]          # this repository's open ideas
+kustomad idea set <n_…> --status doing                              # idea, candidate, doing, done, dropped
+kustomad idea show <n_…>
+```
+
+Ideas belong to the repository the command runs in, unless `--global`; a repository's
+list includes the global ones. Changes are new events, like everything else in the log.
 
 ### Issue summaries
 

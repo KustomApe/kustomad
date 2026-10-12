@@ -18,8 +18,9 @@ Point manual runs at a scratch store so they never touch the real one:
 
 - `src/cli.ts` — commands. `src/server.ts` — the viewer (HTTP, server-sent events, JSON API;
   contract in `docs/API.md`). `src/client.ts` — talking to it, starting it in the background, and
-  the in-process fallback when it cannot run. `src/store.ts` — files by hash, the event log and the
-  `Catalog` the events add up to. `src/feedback.ts` — handing replies to agent sessions.
+  the in-process fallback when it cannot run. `src/store.ts` — files by hash, the event log
+  (posts, feedback, devlog corrections, ideas) and the `Catalog` the events add up to.
+  `src/feedback.ts` — handing replies to agent sessions.
   `src/hook.ts` — agent hooks and the guide text. `src/shell.ts` — splitting command lines.
   `src/landed.ts` — merges/commits a session ran and whether they landed. `src/devlog.ts` —
   sections, period summaries, transcripts. `src/issues.ts` — issue commands. `src/where.ts` —

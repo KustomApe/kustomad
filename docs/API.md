@@ -42,6 +42,13 @@ interface CommentEvent { type: "comment"; id: string; at: string; machine: strin
 interface AnswerEvent  { type: "answer";  id: string; at: string; machine: string; post: string; question: string; choices: string[] /* option ids */; text?: string; by: Author }
 interface IssueInfo    { key: string; title?: string; description?: string /* Markdown */; status?: string; url?: string; details?: string[]; at: string }
 
+type IdeaStatus = "idea" | "candidate" | "doing" | "done" | "dropped";
+interface IdeaView {        // an idea on the board, every change applied
+  id: string /* n_… */; at: string; updated: string /* last change, or at */;
+  title: string; body?: string /* Markdown */; status: IdeaStatus;
+  project?: string /* none: for everything */; by: Author; changes: number;
+}
+
 interface SessionNode { session: string; first: string; last: string; count: number; title: string; open: number }
 interface GroupNode   { id: string; project: string; issue?: string; lane: string; branch?: string; title: string; status?: string; count: number; last: string; open: number; sessions: SessionNode[] }
 interface ProjectNode { project: string; last: string; groups: GroupNode[] }   // newest activity first at every level
@@ -52,7 +59,8 @@ interface ProjectNode { project: string; last: string; groups: GroupNode[] }   /
 | Path | Returns |
 | --- | --- |
 | `/api/health` | `{ ok, version, pid, viewers, home }` |
-| `/api/state?mode=dailies\|devlog&limit=40&before=<post id>&project&lane&issue&session&q&open=1` | `{ posts: PostView[] (newest first), tree: ProjectNode[], counts: { dailies, devlog, open }, issue: IssueInfo\|null, selection, machine }` |
+| `/api/state?mode=dailies\|devlog&limit=40&before=<post id>&project&lane&issue&session&q&open=1` | `{ posts: PostView[] (newest first), tree: ProjectNode[], counts: { dailies, devlog, open, ideas }, issue: IssueInfo\|null, selection, machine }` |
+| `/api/ideas?project&status&q&all=1` | `{ ideas: IdeaView[] (last changed first), projects: { project, open }[], counts }` — done and dropped only with `all=1` or `status`; `project` also lists ideas for everything |
 | `/api/tree?mode=` | `{ tree, counts }` |
 | `/api/issue?key=` | `{ issue }` |
 | `/api/context` | `{ selected: boolean, selection, post: PostView\|null, item?: Item }` |
@@ -79,6 +87,8 @@ titles, notes, file names, issue keys and titles, branches, and devlog text, cas
 | `/api/issues` | `{ key, title?, description?, status?, url?, details?, merge?, by }` | 201 the issue event |
 | `/api/amend` | `{ post, title?, issue?, devlog?: { summary?, craft?, struggle?, decided?, before?, after? }, items?, reason?, by }` | 201 `{ post, amend, url }` |
 | `/api/retract` | `{ post, reason?, undo?, by }` | 201 `{ post, retract }` |
+| `/api/ideas` | `{ title, body?, status?, project?, session?, by }` | 201 `{ idea, url }` |
+| `/api/ideas/change` | `{ idea, title?, body?, status?, project?, session?, by }` — an empty `body`/`project` clears it; 400 when nothing changes | 201 `{ idea, url }` |
 | `/api/path` | `{ item }` | `{ item, path }` — absolute path under `named/` for upload dialogs |
 | `/api/select` | `{ post, item? }` | the selection |
 | `/api/shutdown` | `{ version, force? }` | 200, or 409 unless the caller is newer (or `force`) |
@@ -95,5 +105,6 @@ titles, notes, file names, issue keys and titles, branches, and devlog text, cas
 | `issue` | `IssueInfo` |
 | `amend` | `{ amend, post: PostView }` |
 | `retract` | `{ retract, post: PostView }` |
+| `idea` | `IdeaView` (added or changed) |
 | `select` | selection |
 | `ping` | `{}` every 25 s |

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { compareVersions, flagOn, version, viewerUrl } from "./config.ts";
 import { DailiesServer } from "./server.ts";
-import type { AmendInput, RetractInput, Store } from "./store.ts";
+import type { AmendInput, IdeaChangeInput, IdeaInput, RetractInput, Store } from "./store.ts";
 
 type Env = Record<string, string | undefined>;
 
@@ -106,6 +106,14 @@ export async function write<T>(store: Store, base: string | undefined, path: str
 			}
 			case "/api/retract":
 				return local.retract({ ...(input as unknown as RetractInput), by }) as T;
+			case "/api/ideas": {
+				const idea = local.addIdea({ ...(input as unknown as IdeaInput), by });
+				return { idea, url: `${viewerUrl()}/?mode=ideas#${idea.id}` } as T;
+			}
+			case "/api/ideas/change": {
+				const idea = local.changeIdea({ ...(input as unknown as IdeaChangeInput), by });
+				return { idea, url: `${viewerUrl()}/?mode=ideas#${idea.id}` } as T;
+			}
 		}
 	} catch (error) {
 		const status = (error as { status?: number }).status ?? 500;

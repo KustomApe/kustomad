@@ -176,7 +176,42 @@ export interface RetractEvent {
 	by: Author;
 }
 
-export type DailiesEvent = PostEvent | VerdictEvent | CommentEvent | AnswerEvent | IssueEvent | AmendEvent | RetractEvent;
+/** Where an idea stands, from a loose thought to done (or dropped). */
+export type IdeaStatus = "idea" | "candidate" | "doing" | "done" | "dropped";
+export const IDEA_STATUSES: readonly IdeaStatus[] = ["idea", "candidate", "doing", "done", "dropped"];
+
+/** A note in the idea board: an idea or something to implement. */
+export interface IdeaEvent {
+	type: "idea";
+	id: string;
+	at: string;
+	machine: string;
+	title: string;
+	/** Markdown. */
+	body?: string;
+	status: IdeaStatus;
+	/** The repository it is for; none for ideas about everything. */
+	project?: string;
+	session?: string;
+	by: Author;
+}
+
+/** A change to an idea; an empty text clears that field. */
+export interface IdeaChangeEvent {
+	type: "idea-change";
+	id: string;
+	at: string;
+	machine: string;
+	idea: string;
+	title?: string;
+	body?: string;
+	status?: IdeaStatus;
+	project?: string;
+	session?: string;
+	by: Author;
+}
+
+export type DailiesEvent = PostEvent | VerdictEvent | CommentEvent | AnswerEvent | IssueEvent | AmendEvent | RetractEvent | IdeaEvent | IdeaChangeEvent;
 export type FeedbackEvent = VerdictEvent | CommentEvent | AnswerEvent;
 
 export interface AmendNote {
@@ -469,6 +504,103 @@ export function buildRetract(input: RetractInput, catalog: Catalog, machine: str
 	return JSON.parse(JSON.stringify(event)) as RetractEvent;
 }
 
+/** An idea as it reads now: every change applied. */
+export interface IdeaView {
+	id: string;
+	at: string;
+	/** When it last changed (`at` when never). */
+	updated: string;
+	title: string;
+	body?: string;
+	status: IdeaStatus;
+	project?: string;
+	by: Author;
+	changes: number;
+}
+
+export interface IdeaFilter {
+	/** This project's ideas and the ones for everything. */
+	project?: string;
+	status?: IdeaStatus;
+	q?: string;
+	/** Include done and dropped ideas. */
+	all?: boolean;
+}
+
+export function isIdeaStatus(value: unknown): value is IdeaStatus {
+	return typeof value === "string" && (IDEA_STATUSES as readonly string[]).includes(value);
+}
+
+/** The idea id in an id or in a viewer URL (`http://…/#n_…`). */
+export function ideaIdFrom(value: string): string {
+	const match = /(n_[a-z0-9]+)\s*$/.exec(value.trim());
+	return match ? match[1]! : value.trim();
+}
+
+export interface IdeaInput {
+	title: string;
+	body?: string;
+	status?: IdeaStatus;
+	project?: string;
+	session?: string;
+	by?: Author;
+}
+
+export function buildIdea(input: IdeaInput, machine: string, at: Date = new Date()): IdeaEvent {
+	const title = String(input.title ?? "").trim();
+	if (!title) throw new Error("an idea needs a title");
+	if (input.status !== undefined && !isIdeaStatus(input.status)) throw new Error(`status is one of ${IDEA_STATUSES.join(", ")}`);
+	const event: IdeaEvent = {
+		type: "idea",
+		id: newId("n", at),
+		at: at.toISOString(),
+		machine,
+		title,
+		body: input.body?.trim() || undefined,
+		status: input.status ?? "idea",
+		project: input.project?.trim() || undefined,
+		session: input.session || undefined,
+		by: input.by ?? "agent",
+	};
+	return JSON.parse(JSON.stringify(event)) as IdeaEvent;
+}
+
+export interface IdeaChangeInput {
+	idea: string;
+	title?: string;
+	body?: string;
+	status?: IdeaStatus;
+	project?: string;
+	session?: string;
+	by?: Author;
+}
+
+export function buildIdeaChange(input: IdeaChangeInput, catalog: Catalog, machine: string, at: Date = new Date()): IdeaChangeEvent {
+	const current = catalog.idea(input.idea);
+	if (!current) throw new Error(`no idea ${ideaIdFrom(input.idea)}`);
+	if (input.status !== undefined && !isIdeaStatus(input.status)) throw new Error(`status is one of ${IDEA_STATUSES.join(", ")}`);
+	const title = input.title === undefined ? undefined : input.title.trim();
+	if (title === "") throw new Error("an idea needs a title");
+	const change = {
+		title: title !== undefined && title !== current.title ? title : undefined,
+		body: input.body !== undefined && input.body.trim() !== (current.body ?? "") ? input.body.trim() : undefined,
+		status: input.status !== undefined && input.status !== current.status ? input.status : undefined,
+		project: input.project !== undefined && input.project.trim() !== (current.project ?? "") ? input.project.trim() : undefined,
+	};
+	if (Object.values(change).every((value) => value === undefined)) throw new Error("nothing to change");
+	const event: IdeaChangeEvent = {
+		type: "idea-change",
+		id: newId("u", at),
+		at: at.toISOString(),
+		machine,
+		idea: current.id,
+		...change,
+		session: input.session || undefined,
+		by: input.by ?? "agent",
+	};
+	return JSON.parse(JSON.stringify(event)) as IdeaChangeEvent;
+}
+
 const byTime = <T extends { at: string; id: string }>(a: T, b: T) => (a.at < b.at ? -1 : a.at > b.at ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 
 /** The state the events add up to. Events may arrive in any order (several machines' logs). */
@@ -487,6 +619,9 @@ export class Catalog {
 	private readonly comments = new Map<string, CommentEvent[]>();
 	private readonly answers = new Map<string, Map<string, AnswerEvent>>();
 	private readonly issues = new Map<string, IssueEvent>();
+	private readonly ideaEvents = new Map<string, IdeaEvent>();
+	private readonly ideaChanges = new Map<string, IdeaChangeEvent[]>();
+	private readonly ideasById = new Map<string, IdeaView>();
 	private readonly seen = new Set<string>();
 
 	apply(event: DailiesEvent): void {
@@ -547,7 +682,55 @@ export class Catalog {
 				if (!current || byTime(current, event) < 0) this.issues.set(key, { ...event, key });
 				break;
 			}
+			case "idea": {
+				this.ideaEvents.set(event.id, event);
+				this.rebuildIdea(event.id);
+				break;
+			}
+			case "idea-change": {
+				const list = this.ideaChanges.get(event.idea) ?? [];
+				list.push(event);
+				list.sort(byTime);
+				this.ideaChanges.set(event.idea, list);
+				this.rebuildIdea(event.idea);
+				break;
+			}
 		}
+	}
+
+	/** Re-reads an idea from its first record and every change, in time order. */
+	private rebuildIdea(id: string): void {
+		const first = this.ideaEvents.get(id);
+		if (!first) return;
+		const changes = this.ideaChanges.get(id) ?? [];
+		const view: IdeaView = { id, at: first.at, updated: first.at, title: first.title, body: first.body, status: first.status, project: first.project, by: first.by, changes: changes.length };
+		for (const change of changes) {
+			if (change.title) view.title = change.title;
+			if (change.body !== undefined) view.body = change.body || undefined;
+			if (isIdeaStatus(change.status)) view.status = change.status;
+			if (change.project !== undefined) view.project = change.project || undefined;
+			if (change.at > view.updated) view.updated = change.at;
+		}
+		this.ideasById.set(id, JSON.parse(JSON.stringify(view)) as IdeaView);
+	}
+
+	idea(id: string): IdeaView | undefined {
+		return this.ideasById.get(ideaIdFrom(id));
+	}
+
+	/** Ideas as they read now, most recently changed first; done and dropped only with `all` or `status`. */
+	ideas(filter: IdeaFilter = {}): IdeaView[] {
+		const words = (filter.q ?? "").toLowerCase().split(/\s+/).filter(Boolean);
+		return [...this.ideasById.values()]
+			.filter((idea) => {
+				if (filter.status ? idea.status !== filter.status : !filter.all && (idea.status === "done" || idea.status === "dropped")) return false;
+				// Ideas for everything (no project) belong to every project.
+				if (filter.project && idea.project && idea.project !== filter.project) return false;
+				if (!words.length) return true;
+				const haystack = [idea.title, idea.body, idea.project].filter(Boolean).join("\n").toLowerCase();
+				return words.every((word) => haystack.includes(word));
+			})
+			.sort((a, b) => (a.updated < b.updated ? 1 : a.updated > b.updated ? -1 : a.id < b.id ? 1 : -1));
 	}
 
 	private addHistory(event: FeedbackEvent): void {
@@ -787,7 +970,9 @@ export class Catalog {
 		return out.sort((a, b) => (a.last < b.last ? 1 : a.last > b.last ? -1 : 0));
 	}
 
-	counts(): { dailies: number; devlog: number; open: number } {
+	counts(): { dailies: number; devlog: number; open: number; ideas: number } {
+		let ideas = 0;
+		for (const idea of this.ideasById.values()) if (idea.status !== "done" && idea.status !== "dropped") ideas += 1;
 		let dailies = 0;
 		let devlog = 0;
 		let open = 0;
@@ -797,7 +982,7 @@ export class Catalog {
 			else dailies += 1;
 			open += this.openQuestions(post).length;
 		}
-		return { dailies, devlog, open };
+		return { dailies, devlog, open, ideas };
 	}
 }
 

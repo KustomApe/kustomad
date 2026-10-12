@@ -122,6 +122,11 @@ Hear back:
 - \`kustomad watch\` in the background — exits when the user comments on this session's posts.
 - \`kustomad feedback [--since 2h]\`, \`kustomad list\`, \`kustomad get <item-id>\`.
 
+Ideas — for later: when the user mentions an idea or something to build later, or you
+notice something worth doing outside the current task, note it on the idea board:
+\`kustomad idea add "<title>" [--body -] [--status candidate]\`. \`kustomad idea list\` shows
+this repository's; \`kustomad idea set <n_…> --status doing|done\` as work starts and lands.
+
 Devlog — only merged work: after work lands on the main branch, if it changed something
 a person using the product would notice, record it:
 \`kustomad devlog add --title "<what changed>" --before <file|i_…> --after <file|i_…> --summary -\`

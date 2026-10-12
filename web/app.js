@@ -18,7 +18,9 @@
 		order: [], // ids shown in the feed, newest first
 		hasMore: false,
 		tree: [],
-		counts: { dailies: 0, devlog: 0, open: 0 },
+		counts: { dailies: 0, devlog: 0, open: 0, ideas: 0 },
+		ideas: new Map(), // id → IdeaView (the idea board)
+		ideaProjects: [], // [{ project, open }]
 		issue: null,
 		focused: null, // post id
 		tileIndex: 0,
@@ -989,7 +991,8 @@
 
 	function readUrl() {
 		const params = new URLSearchParams(location.search);
-		state.mode = params.get("mode") === "devlog" ? "devlog" : "dailies";
+		const mode = params.get("mode");
+		state.mode = mode === "devlog" || mode === "ideas" ? mode : "dailies";
 		state.scope = {};
 		for (const key of ["project", "issue", "lane", "session"]) if (params.get(key)) state.scope[key] = params.get(key);
 		state.q = params.get("q") || "";
@@ -1002,7 +1005,9 @@
 		state.loading = true;
 		syncUrl();
 		renderChrome();
+		renderKeys();
 		try {
+			if (state.mode === "ideas") return await loadIdeas(token);
 			const data = await api(`/api/state?${scopeParams({ limit: PAGE })}`);
 			if (token !== loadToken) return;
 			applyMeta(data);
@@ -1088,6 +1093,7 @@
 	}
 
 	function matchesView(post) {
+		if (state.mode === "ideas") return false;
 		const isDevlog = post.kind === "devlog";
 		if ((state.mode === "devlog") !== isDevlog) return false;
 		if (post.retracted) return false;
@@ -1220,6 +1226,7 @@
 		conn.classList.toggle("live", state.connected);
 		$("#conn-text").textContent = state.connected ? (state.viewers > 1 ? t("connViewers", { n: state.viewers }) : t("connLive")) : t("connOffline");
 		document.body.classList.toggle("is-loading", state.loading);
+		document.body.dataset.mode = state.mode;
 		const search = $("#search");
 		if (document.activeElement !== search && search.value !== state.q) search.value = state.q;
 		document.title = open ? `(${open}) KustomAD` : "KustomAD";
@@ -1357,6 +1364,7 @@
 
 	const refreshTree = debounce(async () => {
 		try {
+			if (state.mode === "ideas") return await loadIdeas(loadToken);
 			const data = await api(`/api/tree?mode=${state.mode}`);
 			applyMeta(data);
 			renderTree();
@@ -1530,6 +1538,7 @@
 				if (item) download(item);
 			},
 			Enter: () => keySend(),
+			n: () => state.mode === "ideas" && $("#idea-new-title")?.focus(),
 			"[": () => moveInTree(-1),
 			"]": () => moveInTree(1),
 			"/": () => $("#search").focus(),
@@ -1550,7 +1559,7 @@
 	}
 
 	function renderKeys() {
-		const keys = [
+		const keys = state.mode === "ideas" ? [["n", t("keysNewIdea")], ["[ ]", t("keysSide")], ["/", t("keysSearch")]] : [
 			["j k", t("keysPosts")],
 			["h l", t("keysFiles")],
 			["o", t("keysOk")],
@@ -1669,10 +1678,315 @@
 		}
 	}
 
+	// ── Idea board ──────────────────────────────────────────────────────────
+	// Ideas and things to implement, in columns by status. Anyone may add or move them; agents
+	// do the same with `kustomad idea`.
+
+	const IDEA_COLUMNS = ["idea", "candidate", "doing", "done"];
+	const IDEA_STATUSES = [...IDEA_COLUMNS, "dropped"];
+	const board = { dropped: false, editing: null /* { id, title, body, project } */, draft: { title: "", body: "", project: null, status: "idea" } };
+
+	async function loadIdeas(token) {
+		const params = new URLSearchParams({ all: "1" });
+		if (state.scope.project) params.set("project", state.scope.project);
+		if (state.q) params.set("q", state.q);
+		const data = await api(`/api/ideas?${params}`);
+		if (token !== loadToken) return;
+		state.ideas = new Map(data.ideas.map((idea) => [idea.id, idea]));
+		state.ideaProjects = data.projects || [];
+		if (data.counts) state.counts = data.counts;
+		renderBoard();
+		renderIdeaTree();
+		renderChrome();
+	}
+
+	function matchesIdea(idea) {
+		if (state.scope.project && idea.project && idea.project !== state.scope.project) return false;
+		if (!state.q) return true;
+		const hay = [idea.title, idea.body, idea.project].filter(Boolean).join("\n").toLowerCase();
+		return state.q.toLowerCase().split(/\s+/).filter(Boolean).every((word) => hay.includes(word));
+	}
+
+	function statusLabel(status) {
+		return t(`ideaStatus_${status}`);
+	}
+
+	function projectSelect(value, onchange, focusKey) {
+		const names = state.ideaProjects.map((entry) => entry.project);
+		if (value && !names.includes(value)) names.unshift(value);
+		const select = h("select", { class: "idea-select", title: t("ideaProject"), dataset: focusKey ? { focusKey } : undefined, onchange: (event) => onchange(event.target.value) }, h("option", { value: "" }, t("ideaGlobal")), names.map((name) => h("option", { value: name }, name)));
+		select.value = value || "";
+		return select;
+	}
+
+	function statusSelect(value, onchange) {
+		const select = h("select", { class: `idea-select status s-${value}`, title: t("ideaMove"), onchange: (event) => onchange(event.target.value) }, IDEA_STATUSES.map((status) => h("option", { value: status }, statusLabel(status))));
+		select.value = value;
+		return select;
+	}
+
+	async function changeIdea(id, change) {
+		try {
+			const result = await api("/api/ideas/change", { idea: id, ...change, by: "human" });
+			state.ideas.set(result.idea.id, result.idea);
+			renderBoard();
+			return true;
+		} catch (error) {
+			if (!/nothing to change/.test(error.message)) toast(t("sentFailed", { error: error.message }), true);
+			return false;
+		}
+	}
+
+	async function addIdea() {
+		const draft = board.draft;
+		const title = draft.title.trim();
+		if (!title) return $("#idea-new-title")?.focus();
+		const project = draft.project === null ? state.scope.project || "" : draft.project;
+		try {
+			const result = await api("/api/ideas", { title, body: draft.body, project, status: draft.status, by: "human" });
+			state.ideas.set(result.idea.id, result.idea);
+			board.draft = { title: "", body: "", project: draft.project, status: draft.status };
+			renderBoard(true);
+			$("#idea-new-title")?.focus();
+		} catch (error) {
+			toast(t("sentFailed", { error: error.message }), true);
+		}
+	}
+
+	function composerEl() {
+		const draft = board.draft;
+		const title = h("input", {
+			type: "text",
+			id: "idea-new-title",
+			class: "idea-input",
+			placeholder: t("ideaNewTitle"),
+			value: draft.title,
+			autocomplete: "off",
+			dataset: { focusKey: "idea-new-title" },
+			oninput: (event) => (draft.title = event.target.value),
+			onkeydown: (event) => {
+				if (event.key === "Enter" && !event.isComposing) {
+					event.preventDefault();
+					addIdea();
+				}
+			},
+		});
+		const body = h("textarea", {
+			class: "idea-input idea-body-input",
+			rows: 2,
+			placeholder: t("ideaBodyPlaceholder"),
+			value: draft.body,
+			dataset: { focusKey: "idea-new-body" },
+			oninput: (event) => {
+				draft.body = event.target.value;
+				autosize(event.target);
+			},
+			onkeydown: (event) => {
+				if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+					event.preventDefault();
+					addIdea();
+				}
+			},
+		});
+		const project = draft.project === null ? state.scope.project || "" : draft.project;
+		return h(
+			"form",
+			{ class: "idea-composer", onsubmit: (event) => (event.preventDefault(), addIdea()) },
+			title,
+			body,
+			h(
+				"div",
+				{ class: "idea-composer-row" },
+				projectSelect(project, (value) => (draft.project = value), "idea-new-project"),
+				statusSelect(draft.status, (value) => {
+					draft.status = value;
+					renderBoard();
+				}),
+				h("span", { class: "spacer" }),
+				h("button", { type: "submit", class: "btn primary small" }, t("ideaAdd")),
+			),
+		);
+	}
+
+	function ideaEditor(idea) {
+		const edit = board.editing;
+		const save = async () => {
+			const ok = await changeIdea(idea.id, { title: edit.title, body: edit.body, project: edit.project });
+			if (ok || edit.title.trim()) {
+				board.editing = null;
+				renderBoard();
+			}
+		};
+		const cancel = () => {
+			board.editing = null;
+			renderBoard();
+		};
+		const keys = (event) => {
+			if (event.key === "Escape") {
+				event.preventDefault();
+				cancel();
+			} else if (event.key === "Enter" && (event.metaKey || event.ctrlKey || (event.target.tagName === "INPUT" && !event.isComposing))) {
+				event.preventDefault();
+				save();
+			}
+		};
+		const body = h("textarea", {
+			class: "idea-input idea-body-input",
+			rows: 3,
+			value: edit.body,
+			placeholder: t("ideaBodyPlaceholder"),
+			dataset: { focusKey: `idea-edit-body:${idea.id}` },
+			oninput: (event) => {
+				edit.body = event.target.value;
+				autosize(event.target);
+			},
+			onkeydown: keys,
+		});
+		requestAnimationFrame(() => autosize(body));
+		return h(
+			"article",
+			{ class: `idea editing s-${idea.status}`, id: idea.id },
+			h("input", { type: "text", class: "idea-input", value: edit.title, dataset: { focusKey: `idea-edit-title:${idea.id}` }, oninput: (event) => (edit.title = event.target.value), onkeydown: keys }),
+			body,
+			h(
+				"div",
+				{ class: "idea-composer-row" },
+				projectSelect(edit.project, (value) => (edit.project = value)),
+				h("span", { class: "spacer" }),
+				h("button", { type: "button", class: "btn ghost small", onclick: cancel }, t("ideaCancel")),
+				h("button", { type: "button", class: "btn primary small", onclick: save }, t("ideaSave")),
+			),
+		);
+	}
+
+	function startEdit(idea) {
+		board.editing = { id: idea.id, title: idea.title, body: idea.body || "", project: idea.project || "" };
+		renderBoard();
+		$(`[data-focus-key="idea-edit-title:${CSS.escape(idea.id)}"]`)?.focus();
+	}
+
+	function ideaCard(idea) {
+		if (board.editing && board.editing.id === idea.id) return ideaEditor(idea);
+		const card = h(
+			"article",
+			{ class: `idea s-${idea.status}`, id: idea.id, draggable: true, dataset: { id: idea.id } },
+			h("div", { class: "idea-head" }, h("h3", { class: "idea-title" }, idea.title), h("button", { type: "button", class: "icon-btn small", title: t("ideaEdit"), "aria-label": t("ideaEdit"), onclick: () => startEdit(idea) }, "✎")),
+			idea.body ? markdown(idea.body, "md idea-body") : null,
+			h(
+				"div",
+				{ class: "idea-meta" },
+				idea.project ? h("span", { class: "chip" }, idea.project) : h("span", { class: "chip global" }, t("ideaGlobal")),
+				h("span", { class: "muted" }, idea.by === "agent" ? t("agent") : t("you")),
+				timeEl(idea.updated),
+				h("span", { class: "spacer" }),
+				statusSelect(idea.status, (value) => changeIdea(idea.id, { status: value })),
+			),
+		);
+		card.addEventListener("dragstart", (event) => {
+			event.dataTransfer.setData("text/x-idea", idea.id);
+			event.dataTransfer.effectAllowed = "move";
+			card.classList.add("dragging");
+		});
+		card.addEventListener("dragend", () => card.classList.remove("dragging"));
+		return card;
+	}
+
+	function columnEl(status, ideas) {
+		const column = h(
+			"section",
+			{ class: `idea-col s-${status}`, dataset: { status } },
+			h("header", { class: "idea-col-head" }, h("span", { class: "idea-dot" }), h("h2", null, statusLabel(status)), h("span", { class: "idea-count" }, String(ideas.length))),
+			h("div", { class: "idea-list" }, ideas.length ? ideas.map(ideaCard) : h("p", { class: "idea-none" }, t("ideaNone"))),
+		);
+		column.addEventListener("dragover", (event) => {
+			if (!event.dataTransfer.types.includes("text/x-idea")) return;
+			event.preventDefault();
+			column.classList.add("drop");
+		});
+		column.addEventListener("dragleave", (event) => {
+			if (!column.contains(event.relatedTarget)) column.classList.remove("drop");
+		});
+		column.addEventListener("drop", (event) => {
+			column.classList.remove("drop");
+			const id = event.dataTransfer.getData("text/x-idea");
+			const idea = state.ideas.get(id);
+			if (!idea || idea.status === status) return;
+			event.preventDefault();
+			changeIdea(id, { status });
+		});
+		return column;
+	}
+
+	function renderBoard(resetComposer = false) {
+		const root = $("#board");
+		const saved = cardFocusKey();
+		const ideas = [...state.ideas.values()].filter(matchesIdea).sort((a, b) => (a.updated < b.updated ? 1 : -1));
+		const dropped = ideas.filter((idea) => idea.status === "dropped");
+		const statuses = board.dropped ? IDEA_STATUSES : IDEA_COLUMNS;
+		const composer = !resetComposer && $(".idea-composer", root);
+		const parts = [
+			composer && composer.contains(document.activeElement) ? composer : composerEl(),
+			state.ideas.size || state.q ? null : markdown(t("emptyIdeas"), "md idea-hint"),
+			h("div", { class: `idea-cols${board.dropped ? " with-dropped" : ""}` }, statuses.map((status) => columnEl(status, ideas.filter((idea) => idea.status === status)))),
+			dropped.length || board.dropped
+				? h(
+						"div",
+						{ class: "idea-foot" },
+						h(
+							"button",
+							{
+								type: "button",
+								class: "btn ghost small",
+								onclick: () => {
+									board.dropped = !board.dropped;
+									renderBoard();
+								},
+							},
+							board.dropped ? t("ideaHideDropped") : t("ideaShowDropped", { n: dropped.length }),
+						),
+					)
+				: null,
+		];
+		root.replaceChildren(...parts.filter(Boolean));
+		restoreFocus(saved);
+	}
+
+	function renderIdeaTree() {
+		$("#tree").replaceChildren(
+			h("button", { type: "button", class: `node all${state.scope.project ? "" : " active"}`, dataset: { scope: "{}" } }, h("span", { class: "node-title" }, t("allProjects")), h("span", { class: "node-count" }, state.counts.ideas ? String(state.counts.ideas) : "")),
+			...state.ideaProjects.map((entry) =>
+				h(
+					"button",
+					{ type: "button", class: `node project-node${state.scope.project === entry.project ? " active" : ""}`, dataset: { scope: JSON.stringify({ project: entry.project }) } },
+					h("span", { class: "node-title" }, entry.project),
+					h("span", { class: "node-count" }, entry.open ? String(entry.open) : ""),
+				),
+			),
+		);
+	}
+
+	async function revealIdea(id) {
+		if (state.mode !== "ideas") {
+			state.mode = "ideas";
+			state.scope = {};
+			await load();
+		}
+		if (!document.getElementById(id) && state.ideas.get(id)?.status === "dropped") {
+			board.dropped = true;
+			renderBoard();
+		}
+		const card = document.getElementById(id);
+		if (!card) return;
+		card.scrollIntoView({ block: "center", behavior: "smooth" });
+		card.classList.add("flash");
+		setTimeout(() => card.classList.remove("flash"), 1800);
+	}
+
 	// ── Hash links ──────────────────────────────────────────────────────────
 
 	async function revealHash() {
 		const id = decodeURIComponent(location.hash.slice(1));
+		if (/^n_[a-z0-9]+$/i.test(id)) return revealIdea(id);
 		if (!/^p_[a-z0-9]+$/i.test(id)) return;
 		for (let page = 0; page < 15 && !document.getElementById(id); page++) {
 			if (!state.hasMore) break;
@@ -1769,6 +2083,11 @@
 			if (!data.post) return;
 			state.posts.set(data.post.id, data.post);
 			if (document.getElementById(data.post.id)) replaceCard(data.post.id);
+			refreshTree();
+		});
+		on("idea", (idea) => {
+			state.ideas.set(idea.id, idea);
+			if (state.mode === "ideas") renderBoard();
 			refreshTree();
 		});
 		on("retract", (data) => {

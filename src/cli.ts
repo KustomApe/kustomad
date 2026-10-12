@@ -10,7 +10,7 @@ import { guide, preToolUseHook, sessionEnd, sessionStart, stop, userPromptSubmit
 import { dueForRefresh, fetchIssue, ISSUE_KEY, issueCommandFor, markFetched } from "./issues.ts";
 import { commitsIn, landings, mainBranch, notOnMain } from "./landed.ts";
 import { DailiesServer } from "./server.ts";
-import { optionKey, postIdFrom, Store, type AmendEvent, type Catalog, type CommitRef, type DevlogChange, type IssueEvent, type Item, type Post, type PostView, type Question, type QuestionOption, type RetractEvent } from "./store.ts";
+import { IDEA_STATUSES, ideaIdFrom, isIdeaStatus, optionKey, postIdFrom, Store, type AmendEvent, type IdeaStatus, type IdeaView, type Catalog, type CommitRef, type DevlogChange, type IssueEvent, type Item, type Post, type PostView, type Question, type QuestionOption, type RetractEvent } from "./store.ts";
 import { detectWhere, gitInfo, issueFromBranch } from "./where.ts";
 
 class UsageError extends Error {}
@@ -789,6 +789,111 @@ async function devlog(argv: string[]): Promise<void> {
 	}
 }
 
+// idea --------------------------------------------------------------------------
+
+const STATUS_LABEL: Record<IdeaStatus, string> = { idea: "idea", candidate: "candidate", doing: "doing", done: "done", dropped: "dropped" };
+
+function statusArg(value: string | undefined): IdeaStatus | undefined {
+	if (value === undefined) return undefined;
+	if (!isIdeaStatus(value)) fail(`--status is one of ${IDEA_STATUSES.join(", ")}`);
+	return value;
+}
+
+function ideaLine(idea: IdeaView): string {
+	return `${idea.id}  [${STATUS_LABEL[idea.status]}]  ${idea.title}${idea.project ? `  (${idea.project})` : ""}`;
+}
+
+interface IdeaResult {
+	idea: IdeaView;
+	url: string;
+}
+
+async function ideaAdd(argv: string[]): Promise<void> {
+	const args = parse(argv, { values: ["--body", "--status", "--project"], flags: ["--global", "--json"] });
+	const title = args.positional.join(" ").trim();
+	if (!title) fail('what idea? kustomad idea add "<title>" [--body TEXT|-] [--status candidate]');
+	if (args.flags.has("--global") && args.values.has("--project")) fail("--global and --project cannot go together");
+	const where = detectWhere(process.cwd(), env);
+	const target = store();
+	const base = await ensureViewer(target, env);
+	const result = await write<IdeaResult>(target, base, "/api/ideas", {
+		title,
+		body: textArg(args.values.get("--body")),
+		status: statusArg(args.values.get("--status")),
+		project: args.flags.has("--global") ? undefined : (args.values.get("--project") ?? where.project),
+		session: where.session,
+		by: "agent",
+	});
+	if (args.flags.has("--json")) return json(result);
+	print(`Noted ${ideaLine(result.idea)}\n${result.url}`);
+}
+
+async function ideaSet(argv: string[]): Promise<void> {
+	const args = parse(argv, { values: ["--title", "--body", "--status", "--project"], flags: ["--global", "--json"] });
+	const [id, ...stray] = args.positional;
+	if (!id) fail("which idea? kustomad idea set <n_…> [--status doing] [--title T] [--body TEXT|-]");
+	if (stray.length) fail(`unexpected ${stray.join(" ")} (quote the title: --title "…")`);
+	const target = store();
+	const base = await ensureViewer(target, env);
+	const result = await write<IdeaResult>(target, base, "/api/ideas/change", {
+		idea: ideaIdFrom(id),
+		title: args.values.get("--title"),
+		body: textArg(args.values.get("--body")),
+		status: statusArg(args.values.get("--status")),
+		project: args.flags.has("--global") ? "" : args.values.get("--project"),
+		session: detectWhere(process.cwd(), env).session,
+		by: "agent",
+	});
+	if (args.flags.has("--json")) return json(result);
+	print(`Updated ${ideaLine(result.idea)}`);
+}
+
+async function ideaList(argv: string[]): Promise<void> {
+	const args = parse(argv, { values: ["--status", "--project", "--q"], flags: ["--all", "--everywhere", "--json"] });
+	const status = statusArg(args.values.get("--status"));
+	const project = args.flags.has("--everywhere") ? undefined : (args.values.get("--project") ?? detectWhere(process.cwd(), env).project);
+	const ideas = store()
+		.load()
+		.ideas({ project, status, all: args.flags.has("--all"), q: args.values.get("--q") });
+	if (args.flags.has("--json")) return json({ ideas });
+	if (!ideas.length) return print(status || args.flags.has("--all") ? "No ideas." : "No open ideas. (--all shows done and dropped ones too)");
+	const order = new Map(IDEA_STATUSES.map((name, index) => [name, index]));
+	print(
+		ideas
+			.sort((a, b) => order.get(a.status)! - order.get(b.status)! || (a.updated < b.updated ? 1 : -1))
+			.map(ideaLine)
+			.join("\n"),
+	);
+}
+
+async function ideaShow(argv: string[]): Promise<void> {
+	const args = parse(argv, { flags: ["--json"] });
+	const [id] = args.positional;
+	if (!id) fail("which idea? kustomad idea show <n_…>");
+	const idea = store().load().idea(id);
+	if (!idea) fail(`no idea ${ideaIdFrom(id)}`);
+	if (args.flags.has("--json")) return json({ idea });
+	print([ideaLine(idea), `noted ${idea.at} by ${idea.by}${idea.changes ? ` · changed ${idea.changes}× (last ${idea.updated})` : ""}`, idea.body ? `\n${idea.body}` : ""].join("\n"));
+}
+
+async function idea(argv: string[]): Promise<void> {
+	const [sub, ...rest] = argv;
+	switch (sub) {
+		case "add":
+			return ideaAdd(rest);
+		case "set":
+		case "edit":
+			return ideaSet(rest);
+		case "list":
+		case undefined:
+			return ideaList(rest);
+		case "show":
+			return ideaShow(rest);
+		default:
+			fail("kustomad idea <add|set|list|show> …");
+	}
+}
+
 // viewer --------------------------------------------------------------------------
 
 async function serve(argv: string[]): Promise<void> {
@@ -911,6 +1016,11 @@ Usage:
   kustomad devlog edit <p_…> [--title|--summary|--craft|--struggle|--decided|--before|--after|--no-before|--no-after|--issue] [--reason R]
   kustomad devlog retract <p_…> [--reason R] [--undo]
   kustomad devlog list [--all] | summary [--since 7d|ISO] [--until …] | sweep
+  kustomad idea add "<title>" [--body TEXT|-] [--status S] [--project P|--global] [--json]
+      Note an idea or something to implement on the idea board (statuses: idea, candidate,
+      doing, done, dropped). Ideas belong to this repository unless --global.
+  kustomad idea set <n_…> [--status S] [--title T] [--body TEXT|-] [--project P|--global]
+  kustomad idea list [--status S] [--all] [--project P|--everywhere] [--q WORDS] [--json] | show <n_…>
   kustomad open | status | stop | serve [--port P] [--host H]
   kustomad guide                Instructions to give a coding agent (CLAUDE.md / AGENTS.md)
   kustomad hook <pre-tool-use|session-start|user-prompt-submit|stop|session-end>
@@ -950,6 +1060,9 @@ async function main(argv: string[]): Promise<void> {
 			return issue(rest);
 		case "devlog":
 			return devlog(rest);
+		case "idea":
+		case "ideas":
+			return idea(rest);
 		case "serve":
 			return serve(rest);
 		case "open":

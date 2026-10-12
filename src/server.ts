@@ -8,6 +8,8 @@ import { ISSUE_KEY } from "./issues.ts";
 import { mimeOfExt, needsTranscode } from "./media.ts";
 import {
 	buildAmend,
+	buildIdea,
+	buildIdeaChange,
 	buildPost,
 	buildRetract,
 	newId,
@@ -18,6 +20,9 @@ import {
 	type Catalog,
 	type CommentEvent,
 	type DailiesEvent,
+	type IdeaChangeInput,
+	type IdeaInput,
+	type IdeaView,
 	type IssueEvent,
 	type Item,
 	type ListFilter,
@@ -27,6 +32,7 @@ import {
 	type Store,
 	type Verdict,
 	type VerdictEvent,
+	isIdeaStatus,
 } from "./store.ts";
 
 class HttpError extends Error {
@@ -316,6 +322,33 @@ export class DailiesServer {
 		return { post, retract: event };
 	}
 
+	addIdea(input: IdeaInput): IdeaView {
+		let event;
+		try {
+			event = buildIdea(input, this.store.machine);
+		} catch (error) {
+			throw new HttpError(400, (error as Error).message);
+		}
+		this.record(event);
+		const idea = this.catalog.idea(event.id)!;
+		this.broadcast("idea", idea);
+		return idea;
+	}
+
+	changeIdea(input: IdeaChangeInput): IdeaView {
+		let event;
+		try {
+			event = buildIdeaChange(input, this.catalog, this.store.machine);
+		} catch (error) {
+			const message = (error as Error).message;
+			throw new HttpError(/^no idea/.test(message) ? 404 : 400, message);
+		}
+		this.record(event);
+		const idea = this.catalog.idea(event.idea)!;
+		this.broadcast("idea", idea);
+		return idea;
+	}
+
 	select(postId: string | null, itemId?: string): Selection {
 		if (postId && !this.catalog.post(postId)) throw new HttpError(404, `no post ${postId}`);
 		this.selection = { post: postId, item: itemId || undefined, at: new Date().toISOString() };
@@ -336,6 +369,15 @@ export class DailiesServer {
 
 	counts() {
 		return this.catalog.counts();
+	}
+
+	/** Projects with ideas still open, and every project posts were made in, for the board's sidebar. */
+	private ideaProjects(): { project: string; open: number }[] {
+		const open = new Map<string, number>();
+		for (const idea of this.catalog.ideas()) if (idea.project) open.set(idea.project, (open.get(idea.project) ?? 0) + 1);
+		for (const node of this.catalog.tree()) if (!open.has(node.project)) open.set(node.project, 0);
+		for (const idea of this.catalog.ideas({ all: true })) if (idea.project && !open.has(idea.project)) open.set(idea.project, 0);
+		return [...open].map(([project, count]) => ({ project, open: count })).sort((a, b) => b.open - a.open || a.project.localeCompare(b.project));
 	}
 
 	// Streams -----------------------------------------------------------------
@@ -448,6 +490,14 @@ export class DailiesServer {
 				}
 				case "/api/retract":
 					return sendJson(response, 201, this.retract({ ...(body as unknown as RetractInput), by: body.by === "human" ? "human" : "agent" }));
+				case "/api/ideas": {
+					const idea = this.addIdea({ ...(body as unknown as IdeaInput), by: author(body.by) });
+					return sendJson(response, 201, { idea, url: `${this.url}?mode=ideas#${idea.id}` });
+				}
+				case "/api/ideas/change": {
+					const idea = this.changeIdea({ ...(body as unknown as IdeaChangeInput), idea: String(body.idea ?? ""), by: author(body.by) });
+					return sendJson(response, 201, { idea, url: `${this.url}?mode=ideas#${idea.id}` });
+				}
 				case "/api/path": {
 					const item = this.catalog.item(String(body.item ?? ""));
 					if (!item) throw new HttpError(404, `no item ${body.item}`);
@@ -507,6 +557,12 @@ export class DailiesServer {
 					machine: this.store.machine,
 					version: version(),
 				});
+			}
+			case "/api/ideas": {
+				const status = param("status");
+				if (status !== undefined && !isIdeaStatus(status)) throw new HttpError(400, `no status ${status}`);
+				const ideas = this.catalog.ideas({ project: param("project"), status, q: param("q"), all: url.searchParams.get("all") === "1" });
+				return sendJson(response, 200, { ideas, projects: this.ideaProjects(), counts: this.counts() });
 			}
 			case "/api/tree":
 				return sendJson(response, 200, { tree: this.catalog.tree(mode()), counts: this.counts() });

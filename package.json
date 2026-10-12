@@ -1,6 +1,6 @@
 {
   "name": "kustomad",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A live review page for what your coding agent makes: images, videos, audio and 3D models in one browser tab instead of windows, decisions made there, and replies brought back to the agent.",
   "keywords": ["claude-code", "coding-agent", "dailies", "review", "viewer", "assets", "gamedev"],
   "license": "MIT",

@@ -18,6 +18,7 @@ you show (OK, or a note — on the whole post or on one file) and answer your qu
 | A choice between things to look at: which render, how it looks, what to keep | `kustomad ask` |
 | A page other people read, or that outlives this work (report, shared doc) | an Artifact |
 | Any question answered from words alone — approach, yes/no, a name, what next | the terminal |
+| An idea or something to build later — the user's, or one you noticed out of scope | `kustomad idea add` |
 
 A post with nothing to look at is noise on the page; keep word-only questions in the terminal.
 
@@ -101,6 +102,25 @@ you. Act on the answers; for the next round, ask again in a new post.
 - `kustomad feedback [--since 2h] [--all]`, `kustomad list [--all]`,
   `kustomad get <item-id> [--to PATH]`.
 - `--json` on `show`, `ask`, `context`, `feedback`, `list` gives exact fields.
+
+## Ideas
+
+The viewer's Ideas tab is a board of ideas and things to implement, in columns
+idea → candidate (to build) → doing → done (or dropped). The user writes and moves
+them there; you do the same from the CLI:
+
+```sh
+kustomad idea add "<title>" [--body - <<'EOF' … EOF] [--status candidate] [--global]
+kustomad idea list [--status S] [--all] [--everywhere]
+kustomad idea set <n_…> --status doing      # when you start on one; done when it lands
+kustomad idea show <n_…>
+```
+
+Note an idea when the user mentions something for later, or when you notice something
+worth doing that is outside the current task — instead of doing it unasked. Ideas
+belong to this repository unless `--global`. When the user asks what to work on next,
+read `kustomad idea list`. Move an idea to `doing` when you start it and to `done` once
+it has landed.
 
 ## Devlog
 
