@@ -39,6 +39,10 @@ renders and decides what to keep.
   **Ideas → To build → Doing → Done** (and Dropped). Write them in the page, drag cards
   or change their status; agents add and move them with `kustomad idea`. Per repository,
   or for everything.
+- **Insights** — a dashboard tab: reviews, your replies, devlog entries and finished ideas
+  per day; how long posts waited for your first reply; what kinds of files were shown and
+  how many were kept; a weekday × hour heatmap; activity per repository. 7, 30, 90 or 365
+  days, compared with the period before; `kustomad stats` prints the same in the terminal.
 - **The issue on screen** — above an issue's posts: title, status, description,
   fetched by a command you configure (Linear, GitHub, Jira…) or written by the agent.
 - **Take files with you** — copy an image to the clipboard, copy any file's path for an
@@ -235,6 +239,19 @@ kustomad idea show <n_…>
 
 Ideas belong to the repository the command runs in, unless `--global`; a repository's
 list includes the global ones. Changes are new events, like everything else in the log.
+
+### Insights
+
+The Insights tab charts what the log adds up to: activity per day, time to your first
+reply, kinds of files, marks, when work happens and which repositories were busy. Pick
+the period with the buttons or keys `1`–`4`; pick a repository in the sidebar. The same
+numbers in the terminal:
+
+```sh
+kustomad stats                 # last 30 days, every repository, with the change from the 30 days before
+kustomad stats --days 7 --here # this repository only
+kustomad stats --json
+```
 
 ### Issue summaries
 

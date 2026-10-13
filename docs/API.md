@@ -49,6 +49,20 @@ interface IdeaView {        // an idea on the board, every change applied
   project?: string /* none: for everything */; by: Author; changes: number;
 }
 
+interface StatsTotals { reviews: number; files: number; devlog: number; questions: number; answered: number; replies: number /* the user's comments, answers, marks */; ideasAdded: number; ideasDone: number }
+interface StatsView {       // the Insights tab; days and hours in the viewer's time zone
+  range: { from: string; to: string; days: number; tz: number /* minutes ahead of UTC */ };
+  project?: string;
+  totals: StatsTotals; previous: StatsTotals /* the same length of time just before */;
+  daily: { day: string /* YYYY-MM-DD */; reviews: number; devlog: number; replies: number; ideasAdded: number; ideasDone: number }[];
+  kinds: { kind: Kind; count: number }[];                 // files in reviews, most first
+  verdicts: { adopted: number; rejected: number; unmarked: number };
+  response: { median: number | null /* ms from a post to the user's first reply */; samples: number; buckets: { key: "5m" | "30m" | "2h" | "1d" | "more"; count: number }[] };
+  hours: number[][];        // [weekday 0 = Sunday][hour]: posts and replies
+  projects: { project: string; reviews: number; devlog: number; replies: number; last: string }[];
+  ideas: Record<IdeaStatus, number>;                      // as they stand now
+}
+
 interface SessionNode { session: string; first: string; last: string; count: number; title: string; open: number }
 interface GroupNode   { id: string; project: string; issue?: string; lane: string; branch?: string; title: string; status?: string; count: number; last: string; open: number; sessions: SessionNode[] }
 interface ProjectNode { project: string; last: string; groups: GroupNode[] }   // newest activity first at every level
@@ -60,6 +74,7 @@ interface ProjectNode { project: string; last: string; groups: GroupNode[] }   /
 | --- | --- |
 | `/api/health` | `{ ok, version, pid, viewers, home }` |
 | `/api/state?mode=dailies\|devlog&limit=40&before=<post id>&project&lane&issue&session&q&open=1` | `{ posts: PostView[] (newest first), tree: ProjectNode[], counts: { dailies, devlog, open, ideas }, issue: IssueInfo\|null, selection, machine }` |
+| `/api/stats?days=30&tz=<minutes ahead of UTC>&project` | `{ stats: StatsView, projects: string[], counts }` — retracted posts left out; `days` 1–366 |
 | `/api/ideas?project&status&q&all=1` | `{ ideas: IdeaView[] (last changed first), projects: { project, open }[], counts }` — done and dropped only with `all=1` or `status`; `project` also lists ideas for everything |
 | `/api/tree?mode=` | `{ tree, counts }` |
 | `/api/issue?key=` | `{ issue }` |

@@ -982,6 +982,7 @@
 		const lang = new URLSearchParams(location.search).get("lang");
 		if (lang) params.set("lang", lang);
 		if (state.mode !== "dailies") params.set("mode", state.mode);
+		if (state.mode === "stats" && dash.days !== 30) params.set("days", String(dash.days));
 		for (const key of ["project", "issue", "lane", "session"]) if (state.scope[key]) params.set(key, state.scope[key]);
 		if (state.q) params.set("q", state.q);
 		if (state.onlyOpen) params.set("open", "1");
@@ -992,7 +993,8 @@
 	function readUrl() {
 		const params = new URLSearchParams(location.search);
 		const mode = params.get("mode");
-		state.mode = mode === "devlog" || mode === "ideas" ? mode : "dailies";
+		state.mode = mode === "devlog" || mode === "ideas" || mode === "stats" ? mode : "dailies";
+		if (RANGES.includes(Number(params.get("days")))) dash.days = Number(params.get("days"));
 		state.scope = {};
 		for (const key of ["project", "issue", "lane", "session"]) if (params.get(key)) state.scope[key] = params.get(key);
 		state.q = params.get("q") || "";
@@ -1008,6 +1010,7 @@
 		renderKeys();
 		try {
 			if (state.mode === "ideas") return await loadIdeas(token);
+			if (state.mode === "stats") return await loadStats(token);
 			const data = await api(`/api/state?${scopeParams({ limit: PAGE })}`);
 			if (token !== loadToken) return;
 			applyMeta(data);
@@ -1093,7 +1096,7 @@
 	}
 
 	function matchesView(post) {
-		if (state.mode === "ideas") return false;
+		if (state.mode === "ideas" || state.mode === "stats") return false;
 		const isDevlog = post.kind === "devlog";
 		if ((state.mode === "devlog") !== isDevlog) return false;
 		if (post.retracted) return false;
@@ -1365,6 +1368,7 @@
 	const refreshTree = debounce(async () => {
 		try {
 			if (state.mode === "ideas") return await loadIdeas(loadToken);
+			if (state.mode === "stats") return await loadStats(loadToken);
 			const data = await api(`/api/tree?mode=${state.mode}`);
 			applyMeta(data);
 			renderTree();
@@ -1547,6 +1551,10 @@
 				if (state.pending.length) showPending();
 			},
 		};
+		if (state.mode === "stats" && /^[1-4]$/.test(key)) {
+			event.preventDefault();
+			return setRange(RANGES[Number(key) - 1]);
+		}
 		if (/^[1-9]$/.test(key)) {
 			event.preventDefault();
 			return keyChooseOption(Number(key));
@@ -1559,7 +1567,7 @@
 	}
 
 	function renderKeys() {
-		const keys = state.mode === "ideas" ? [["n", t("keysNewIdea")], ["[ ]", t("keysSide")], ["/", t("keysSearch")]] : [
+		const keys = state.mode === "ideas" ? [["n", t("keysNewIdea")], ["[ ]", t("keysSide")], ["/", t("keysSearch")]] : state.mode === "stats" ? [["1–4", t("keysRange")], ["[ ]", t("keysSide")]] : [
 			["j k", t("keysPosts")],
 			["h l", t("keysFiles")],
 			["o", t("keysOk")],
@@ -1982,6 +1990,396 @@
 		setTimeout(() => card.classList.remove("flash"), 1800);
 	}
 
+	// ── Insights ────────────────────────────────────────────────────────────
+	// Charts of what the log adds up to over a period: activity, reply times, kinds, marks,
+	// hours, repositories and the idea board. Drawn as plain SVG and HTML; no chart library.
+
+	const RANGES = [7, 30, 90, 365];
+	const dash = { days: 30, stats: null, projects: [] };
+	const SVG_NS = "http://www.w3.org/2000/svg";
+
+	function svg(tag, attrs, ...kids) {
+		const el = document.createElementNS(SVG_NS, tag);
+		for (const [key, value] of Object.entries(attrs || {})) if (value !== undefined && value !== null && value !== false) el.setAttribute(key, String(value));
+		for (const kid of kids.flat(Infinity)) if (kid) el.append(kid);
+		return el;
+	}
+
+	const numberFormat = new Intl.NumberFormat(LANG);
+	const num = (value) => numberFormat.format(value);
+
+	function shortDay(day) {
+		const [, month, date] = day.split("-");
+		return `${Number(month)}/${Number(date)}`;
+	}
+
+	function duration(ms) {
+		const ja = LANG === "ja";
+		if (ms < 60_000) return ja ? `${Math.max(1, Math.round(ms / 1000))}秒` : `${Math.max(1, Math.round(ms / 1000))} s`;
+		if (ms < 3_600_000) return ja ? `${Math.round(ms / 60_000)}分` : `${Math.round(ms / 60_000)} min`;
+		if (ms < 86_400_000) return ja ? `${(ms / 3_600_000).toFixed(1)}時間` : `${(ms / 3_600_000).toFixed(1)} h`;
+		return ja ? `${(ms / 86_400_000).toFixed(1)}日` : `${(ms / 86_400_000).toFixed(1)} d`;
+	}
+
+	function kindLabel(kind) {
+		const key = `kind${kind[0].toUpperCase()}${kind.slice(1)}`;
+		return t(key);
+	}
+
+	async function loadStats(token) {
+		const params = new URLSearchParams({ days: String(dash.days), tz: String(-new Date().getTimezoneOffset()) });
+		if (state.scope.project) params.set("project", state.scope.project);
+		const data = await api(`/api/stats?${params}`);
+		if (token !== loadToken) return;
+		dash.stats = data.stats;
+		dash.projects = data.projects || [];
+		if (data.counts) state.counts = data.counts;
+		renderDash();
+		renderStatsTree();
+		renderChrome();
+	}
+
+	function setRange(days) {
+		if (dash.days === days) return;
+		dash.days = days;
+		syncUrl();
+		load();
+	}
+
+	function renderStatsTree() {
+		$("#tree").replaceChildren(
+			h("button", { type: "button", class: `node all${state.scope.project ? "" : " active"}`, dataset: { scope: "{}" } }, h("span", { class: "node-title" }, t("allProjects"))),
+			...dash.projects.map((project) =>
+				h("button", { type: "button", class: `node project-node${state.scope.project === project ? " active" : ""}`, dataset: { scope: JSON.stringify({ project }) } }, h("span", { class: "node-title" }, project)),
+			),
+		);
+	}
+
+	// One sum per bar: days for short periods, weeks for long ones.
+	function bars(daily) {
+		const size = daily.length > 120 ? 7 : 1;
+		const out = [];
+		for (let index = 0; index < daily.length; index += size) {
+			const days = daily.slice(index, index + size);
+			const sum = (key) => days.reduce((total, day) => total + day[key], 0);
+			out.push({ from: days[0].day, to: days[days.length - 1].day, reviews: sum("reviews"), devlog: sum("devlog"), replies: sum("replies"), ideasAdded: sum("ideasAdded"), ideasDone: sum("ideasDone") });
+		}
+		return out;
+	}
+
+	function niceMax(value) {
+		if (value <= 4) return Math.max(1, value);
+		const step = 10 ** Math.floor(Math.log10(value));
+		for (const factor of [1, 2, 2.5, 5, 10]) if (factor * step >= value) return factor * step;
+		return 10 * step;
+	}
+
+	function sparkline(values) {
+		const width = 96;
+		const height = 28;
+		const max = Math.max(1, ...values);
+		const step = values.length > 1 ? width / (values.length - 1) : width;
+		const points = values.map((value, index) => [index * step, height - 2 - (value / max) * (height - 4)]);
+		const line = points.map(([x, y], index) => `${index ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`).join("");
+		return svg(
+			"svg",
+			{ class: "spark", viewBox: `0 0 ${width} ${height}`, preserveAspectRatio: "none", "aria-hidden": "true" },
+			svg("path", { class: "spark-area", d: `${line}L${width},${height}L0,${height}Z` }),
+			svg("path", { class: "spark-line", d: line, "vector-effect": "non-scaling-stroke" }),
+		);
+	}
+
+	function delta(now, before, { lowerIsBetter = false } = {}) {
+		if (now === before) return h("span", { class: "kpi-delta flat", title: t("statsVsBefore") }, "±0");
+		const up = now > before;
+		const good = up !== lowerIsBetter;
+		return h("span", { class: `kpi-delta ${good ? "good" : "bad"}`, title: t("statsVsBefore") }, `${up ? "▲" : "▼"} ${num(Math.abs(now - before))}`);
+	}
+
+	function kpi({ label, value, sub, change, spark, tone }) {
+		return h("div", { class: `kpi${tone ? ` ${tone}` : ""}` }, h("div", { class: "kpi-label" }, label), h("div", { class: "kpi-row" }, h("span", { class: "kpi-value" }, value), change, spark || null), h("div", { class: "kpi-sub", title: sub || undefined }, sub || "\u00a0"));
+	}
+
+	function panel(title, hint, body, className = "") {
+		return h("section", { class: `panel ${className}` }, h("header", { class: "panel-head" }, h("h2", null, title), hint ? h("span", { class: "panel-hint" }, hint) : null), body);
+	}
+
+	function legend(entries) {
+		return h(
+			"div",
+			{ class: "legend" },
+			entries.map(([tone, label, value]) => h("span", { class: `legend-item ${tone}` }, h("i"), h("span", null, label), value === undefined ? null : h("b", null, value))),
+		);
+	}
+
+	// Posts as stacked bars (reviews, devlog) and the user's replies as a line over them.
+	function activityChart(host, stats) {
+		const data = bars(stats.daily);
+		const width = Math.max(280, host.clientWidth);
+		const height = 220;
+		const pad = { top: 12, right: 8, bottom: 24, left: 30 };
+		const innerW = width - pad.left - pad.right;
+		const innerH = height - pad.top - pad.bottom;
+		const max = niceMax(Math.max(1, ...data.map((bar) => Math.max(bar.reviews + bar.devlog, bar.replies))));
+		const slot = innerW / data.length;
+		const barW = Math.max(1, Math.min(28, slot * 0.66));
+		const y = (value) => pad.top + innerH - (value / max) * innerH;
+		const grid = [];
+		const ticks = max <= 4 ? max : 4;
+		for (let index = 0; index <= ticks; index++) {
+			const value = (max / ticks) * index;
+			grid.push(svg("line", { class: "grid", x1: pad.left, x2: width - pad.right, y1: y(value), y2: y(value) }));
+			grid.push(svg("text", { class: "axis", x: pad.left - 6, y: y(value) + 3.5, "text-anchor": "end" }, document.createTextNode(num(Math.round(value * 10) / 10))));
+		}
+		const labelEvery = Math.max(1, Math.ceil(data.length / Math.max(2, Math.floor(innerW / 54))));
+		const marks = [];
+		const line = [];
+		data.forEach((bar, index) => {
+			const x = pad.left + slot * index + (slot - barW) / 2;
+			const center = pad.left + slot * index + slot / 2;
+			const reviewsTop = y(bar.reviews);
+			const devlogTop = y(bar.reviews + bar.devlog);
+			if (bar.reviews) marks.push(svg("rect", { class: "bar reviews", x, y: reviewsTop, width: barW, height: pad.top + innerH - reviewsTop, rx: Math.min(2, barW / 3) }));
+			if (bar.devlog) marks.push(svg("rect", { class: "bar devlog", x, y: devlogTop, width: barW, height: reviewsTop - devlogTop, rx: Math.min(2, barW / 3) }));
+			line.push([center, y(bar.replies)]);
+			if (index % labelEvery === 0) marks.push(svg("text", { class: "axis", x: center, y: height - 6, "text-anchor": "middle" }, document.createTextNode(shortDay(bar.from))));
+			const when = bar.from === bar.to ? shortDay(bar.from) : `${shortDay(bar.from)} – ${shortDay(bar.to)}`;
+			const tip = `${when}\n${t("statsReviews")} ${bar.reviews}\n${t("statsDevlog")} ${bar.devlog}\n${t("statsReplies")} ${bar.replies}`;
+			marks.push(svg("rect", { class: "hit", x: pad.left + slot * index, y: pad.top, width: slot, height: innerH, "data-tip": tip }));
+		});
+		const path = line.map(([x, yy], index) => `${index ? "L" : "M"}${x.toFixed(1)},${yy.toFixed(1)}`).join("");
+		const dots = data.length <= 45 ? line.map(([x, yy]) => svg("circle", { class: "dot replies", cx: x, cy: yy, r: 2.5 })) : [];
+		host.replaceChildren(svg("svg", { class: "chart", width, height, viewBox: `0 0 ${width} ${height}`, role: "img", "aria-label": t("statsActivity") }, grid, svg("path", { class: "line replies", d: path }), marks.filter((mark) => mark.classList.contains("bar") || mark.tagName === "text"), dots, marks.filter((mark) => mark.classList.contains("hit"))));
+	}
+
+	function donut(entries, total) {
+		const radius = 52;
+		const circumference = 2 * Math.PI * radius;
+		let offset = 0;
+		const rings = entries.map(({ tone, value, tip }) => {
+			const length = (value / total) * circumference;
+			const ring = svg("circle", { class: `ring ${tone}`, cx: 70, cy: 70, r: radius, "stroke-dasharray": `${Math.max(0, length - 1.5)} ${circumference}`, "stroke-dashoffset": -offset, "data-tip": tip });
+			offset += length;
+			return ring;
+		});
+		return svg(
+			"svg",
+			{ class: "donut", viewBox: "0 0 140 140", width: 140, height: 140, role: "img" },
+			svg("circle", { class: "ring-bg", cx: 70, cy: 70, r: radius }),
+			svg("g", { transform: "rotate(-90 70 70)" }, rings),
+			svg("text", { class: "donut-value", x: 70, y: 70, "text-anchor": "middle" }, document.createTextNode(num(total))),
+			svg("text", { class: "donut-label", x: 70, y: 88, "text-anchor": "middle" }, document.createTextNode(t("statsTotal"))),
+		);
+	}
+
+	function hbars(rows, className = "") {
+		const max = Math.max(1, ...rows.map((row) => row.value));
+		return h(
+			"div",
+			{ class: `hbars ${className}` },
+			rows.map((row) =>
+				h(
+					row.onclick ? "button" : "div",
+					{ type: row.onclick ? "button" : undefined, class: `hbar ${row.tone || ""}`, onclick: row.onclick, "data-tip": row.tip },
+					h("span", { class: "hbar-label" }, row.label),
+					h("span", { class: "hbar-track" }, row.parts ? row.parts.map((part) => h("span", { class: `hbar-fill ${part.tone}`, style: `width:${(part.value / max) * 100}%` })) : h("span", { class: "hbar-fill", style: `width:${(row.value / max) * 100}%` })),
+					h("span", { class: "hbar-value" }, row.display ?? num(row.value)),
+				),
+			),
+		);
+	}
+
+	function heatmap(hours) {
+		const order = [1, 2, 3, 4, 5, 6, 0];
+		const names = t("statsWeekdays");
+		const max = Math.max(1, ...hours.flat());
+		const cells = [h("span", { class: "hm-corner" })];
+		for (let hour = 0; hour < 24; hour++) cells.push(h("span", { class: "hm-hour" }, hour % 3 === 0 ? String(hour) : ""));
+		for (const day of order) {
+			cells.push(h("span", { class: "hm-day" }, names[day]));
+			for (let hour = 0; hour < 24; hour++) {
+				const value = hours[day][hour];
+				const level = value ? 12 + Math.round((value / max) * 88) : 0;
+				cells.push(h("span", { class: `hm-cell${value ? "" : " zero"}`, style: value ? `--level:${level}%` : undefined, "data-tip": `${names[day]} ${hour}:00–${hour + 1}:00\n${num(value)}` }));
+			}
+		}
+		return h("div", { class: "heatmap" }, cells);
+	}
+
+	function renderDash() {
+		const root = $("#dash");
+		const stats = dash.stats;
+		if (!stats) return root.replaceChildren();
+		const { totals, previous, daily, verdicts, response, ideas } = stats;
+		const series = (key) => bars(daily).map((bar) => bar[key]);
+		const marked = verdicts.adopted + verdicts.rejected;
+		const nothing = !totals.reviews && !totals.devlog && !totals.replies && !totals.ideasAdded && !Object.values(ideas).some(Boolean);
+
+		const head = h(
+			"header",
+			{ class: "dash-head" },
+			h("div", { class: "dash-title" }, h("h1", null, state.scope.project || t("allProjects")), h("span", { class: "dash-range" }, t("statsRange", { from: shortDay(daily[0].day), to: shortDay(daily[daily.length - 1].day) }))),
+			h(
+				"div",
+				{ class: "seg", role: "group", "aria-label": t("keysRange") },
+				RANGES.map((days, index) => h("button", { type: "button", class: `seg-btn${dash.days === days ? " active" : ""}`, "aria-pressed": dash.days === days ? "true" : "false", title: `${index + 1}`, onclick: () => setRange(days) }, t("statsDays", { n: days }))),
+			),
+		);
+
+		const kpis = h(
+			"div",
+			{ class: "kpis" },
+			kpi({ label: t("statsReviews"), value: num(totals.reviews), change: delta(totals.reviews, previous.reviews), sub: `${t("statsFiles")} ${num(totals.files)}`, spark: sparkline(series("reviews")), tone: "t-reviews" }),
+			kpi({ label: t("statsReplies"), value: num(totals.replies), change: delta(totals.replies, previous.replies), sub: totals.questions ? t("statsAnswered", { a: totals.answered, q: totals.questions }) : "", spark: sparkline(series("replies")), tone: "t-replies" }),
+			kpi({ label: t("statsFirstReply"), value: response.median === null ? "—" : duration(response.median), sub: response.samples ? t("statsSamples", { n: response.samples }) : "", tone: "t-time" }),
+			kpi({ label: t("statsOkRate"), value: marked ? `${Math.round((verdicts.adopted / marked) * 100)}%` : "—", sub: marked ? t("statsMarks", { ok: verdicts.adopted, no: verdicts.rejected }) : t("statsNoMarks"), tone: "t-ok" }),
+			kpi({ label: t("statsDevlog"), value: num(totals.devlog), change: delta(totals.devlog, previous.devlog), spark: sparkline(series("devlog")), tone: "t-devlog" }),
+			kpi({ label: t("statsIdeasDone"), value: num(totals.ideasDone), change: delta(totals.ideasDone, previous.ideasDone), sub: t("statsIdeasFlow", { a: totals.ideasAdded, d: totals.ideasDone }), spark: sparkline(series("ideasDone")), tone: "t-ideas" }),
+		);
+
+		const activityHost = h("div", { class: "chart-host" });
+		const activity = panel(
+			t("statsActivity"),
+			t("statsActivityHint"),
+			h("div", null, legend([["t-reviews", t("statsReviews"), num(totals.reviews)], ["t-devlog", t("statsDevlog"), num(totals.devlog)], ["t-replies line", t("statsReplies"), num(totals.replies)]]), activityHost),
+			"wide",
+		);
+
+		const bucketTones = { "5m": "t-ok", "30m": "t-replies", "2h": "t-time", "1d": "t-warn", more: "t-danger" };
+		const waits = panel(
+			t("statsResponse"),
+			t("statsResponseHint"),
+			response.samples ? hbars(response.buckets.map((bucket) => ({ label: t(`statsBucket_${bucket.key}`), value: bucket.count, tone: bucketTones[bucket.key], display: `${num(bucket.count)} · ${Math.round((bucket.count / response.samples) * 100)}%` }))) : h("p", { class: "panel-none" }, t("statsNothing")),
+			"narrow",
+		);
+
+		const kindTotal = stats.kinds.reduce((sum, entry) => sum + entry.count, 0);
+		const kinds = panel(
+			t("statsKinds"),
+			null,
+			kindTotal
+				? h(
+						"div",
+						{ class: "donut-wrap" },
+						donut(stats.kinds.map((entry) => ({ tone: `k-${entry.kind}`, value: entry.count, tip: `${kindLabel(entry.kind)}\n${num(entry.count)} · ${Math.round((entry.count / kindTotal) * 100)}%` })), kindTotal),
+						legend(stats.kinds.map((entry) => [`k-${entry.kind}`, kindLabel(entry.kind), `${num(entry.count)} · ${Math.round((entry.count / kindTotal) * 100)}%`])),
+					)
+				: h("p", { class: "panel-none" }, t("statsNothing")),
+			"narrow",
+		);
+
+		const hoursPanel = panel(t("statsHours"), t("statsHoursHint"), heatmap(stats.hours), "wide");
+
+		const projects = panel(
+			t("statsProjects"),
+			null,
+			stats.projects.length
+				? hbars(
+						stats.projects.slice(0, 10).map((entry) => ({
+							label: entry.project,
+							value: entry.reviews + entry.devlog + entry.replies,
+							parts: [
+								{ tone: "t-reviews", value: entry.reviews },
+								{ tone: "t-devlog", value: entry.devlog },
+								{ tone: "t-replies", value: entry.replies },
+							],
+							tip: `${entry.project}\n${t("statsReviews")} ${entry.reviews}\n${t("statsDevlog")} ${entry.devlog}\n${t("statsReplies")} ${entry.replies}`,
+							onclick: state.scope.project ? undefined : () => setScope({ project: entry.project }),
+						})),
+						"stacked",
+					)
+				: h("p", { class: "panel-none" }, t("statsNothing")),
+			"wide",
+		);
+
+		const verdictTotal = verdicts.adopted + verdicts.rejected + verdicts.unmarked;
+		const verdictRows = [
+			["t-ok", t("statsAdopted"), verdicts.adopted],
+			["t-danger", t("statsRejected"), verdicts.rejected],
+			["t-muted", t("statsUnmarked"), verdicts.unmarked],
+		];
+		const marks = panel(
+			t("statsVerdicts"),
+			null,
+			verdictTotal
+				? h("div", null, h("div", { class: "stackbar" }, verdictRows.filter(([, , value]) => value).map(([tone, label, value]) => h("span", { class: `stack-part ${tone}`, style: `flex:${value}`, "data-tip": `${label}\n${num(value)} · ${Math.round((value / verdictTotal) * 100)}%` }))), legend(verdictRows.map(([tone, label, value]) => [tone, label, `${num(value)} · ${Math.round((value / verdictTotal) * 100)}%`])))
+				: h("p", { class: "panel-none" }, t("statsNothing")),
+			"narrow",
+		);
+
+		const ideaTotal = Object.values(ideas).reduce((sum, value) => sum + value, 0);
+		const ideaPanel = panel(
+			t("statsIdeas"),
+			t("statsIdeasFlow", { a: totals.ideasAdded, d: totals.ideasDone }),
+			h(
+				"div",
+				null,
+				ideaTotal ? h("div", { class: "stackbar" }, IDEA_STATUSES.filter((status) => ideas[status]).map((status) => h("span", { class: `stack-part s-${status}`, style: `flex:${ideas[status]}`, "data-tip": `${statusLabel(status)}\n${num(ideas[status])}` }))) : null,
+				legend(IDEA_STATUSES.map((status) => [`s-${status}`, statusLabel(status), num(ideas[status])])),
+				h(
+					"button",
+					{
+						type: "button",
+						class: "btn ghost small",
+						onclick: () => {
+							state.mode = "ideas";
+							load();
+						},
+					},
+					`${t("statsOpenBoard")} →`,
+				),
+			),
+			"narrow",
+		);
+
+		const parts = [head, nothing ? markdown(t("statsEmpty"), "md dash-hint") : null, kpis, h("div", { class: "panels" }, activity, waits, hoursPanel, kinds, projects, h("div", { class: "panel-stack narrow" }, marks, ideaPanel))];
+		root.replaceChildren(...parts.filter(Boolean));
+		activityChart(activityHost, stats);
+	}
+
+	// Redraws the one chart that is sized in pixels when its panel changes width.
+	const dashResize = new ResizeObserver(
+		debounce(() => {
+			const host = $("#dash .chart-host");
+			if (host && dash.stats && state.mode === "stats") activityChart(host, dash.stats);
+		}, 120),
+	);
+
+	// A tooltip for anything in the dashboard with data-tip.
+	function wireTips() {
+		const tip = h("div", { class: "chart-tip", role: "tooltip", hidden: true });
+		document.body.append(tip);
+		const root = $("#dash");
+		let current = null;
+		root.addEventListener("pointermove", (event) => {
+			const target = event.target.closest?.("[data-tip]");
+			if (!target || !root.contains(target)) {
+				if (current) current.classList.remove("tipped");
+				current = null;
+				tip.hidden = true;
+				return;
+			}
+			if (target !== current) {
+				if (current) current.classList.remove("tipped");
+				current = target;
+				current.classList.add("tipped");
+				const [first, ...rest] = target.getAttribute("data-tip").split("\n");
+				tip.replaceChildren(h("strong", null, first), ...rest.map((line) => h("span", null, line)));
+				tip.hidden = false;
+			}
+			const box = tip.getBoundingClientRect();
+			const x = Math.min(window.innerWidth - box.width - 8, event.clientX + 14);
+			const y = event.clientY + 16 + box.height > window.innerHeight ? event.clientY - box.height - 12 : event.clientY + 16;
+			tip.style.transform = `translate(${Math.max(8, x)}px, ${y}px)`;
+		});
+		root.addEventListener("pointerleave", () => {
+			if (current) current.classList.remove("tipped");
+			current = null;
+			tip.hidden = true;
+		});
+		dashResize.observe(root);
+	}
+
 	// ── Hash links ──────────────────────────────────────────────────────────
 
 	async function revealHash() {
@@ -2199,6 +2597,7 @@
 			if (event.target.id === "lb-stage" || event.target.classList.contains("lb-media")) closeLightbox();
 		});
 		document.addEventListener("keydown", onKey);
+		wireTips();
 		window.addEventListener("hashchange", revealHash);
 		window.addEventListener("scroll", () => {
 			if (nearTop() && state.pending.length) showPending();

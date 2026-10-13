@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { compareVersions, ROOT, version } from "./config.ts";
 import { ISSUE_KEY } from "./issues.ts";
 import { mimeOfExt, needsTranscode } from "./media.ts";
+import { stats } from "./stats.ts";
 import {
 	buildAmend,
 	buildIdea,
@@ -563,6 +564,11 @@ export class DailiesServer {
 				if (status !== undefined && !isIdeaStatus(status)) throw new HttpError(400, `no status ${status}`);
 				const ideas = this.catalog.ideas({ project: param("project"), status, q: param("q"), all: url.searchParams.get("all") === "1" });
 				return sendJson(response, 200, { ideas, projects: this.ideaProjects(), counts: this.counts() });
+			}
+			case "/api/stats": {
+				const number = (name: string) => (url.searchParams.has(name) && Number.isFinite(Number(url.searchParams.get(name))) ? Number(url.searchParams.get(name)) : undefined);
+				const projects = [...new Set(this.catalog.posts.filter((post) => !post.retracted).map((post) => post.project))].sort();
+				return sendJson(response, 200, { stats: stats(this.catalog, { project: param("project"), days: number("days"), tz: number("tz") }), projects, counts: this.counts() });
 			}
 			case "/api/tree":
 				return sendJson(response, 200, { tree: this.catalog.tree(mode()), counts: this.counts() });

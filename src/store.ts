@@ -718,6 +718,15 @@ export class Catalog {
 		return this.ideasById.get(ideaIdFrom(id));
 	}
 
+	/** When a done idea was last moved to done. */
+	ideaDoneAt(id: string): string | undefined {
+		const first = this.ideaEvents.get(ideaIdFrom(id));
+		if (!first) return undefined;
+		let at = first.status === "done" ? first.at : undefined;
+		for (const change of this.ideaChanges.get(first.id) ?? []) if (isIdeaStatus(change.status)) at = change.status === "done" ? change.at : undefined;
+		return at;
+	}
+
 	/** Ideas as they read now, most recently changed first; done and dropped only with `all` or `status`. */
 	ideas(filter: IdeaFilter = {}): IdeaView[] {
 		const words = (filter.q ?? "").toLowerCase().split(/\s+/).filter(Boolean);

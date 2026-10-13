@@ -10,6 +10,7 @@ import { guide, preToolUseHook, sessionEnd, sessionStart, stop, userPromptSubmit
 import { dueForRefresh, fetchIssue, ISSUE_KEY, issueCommandFor, markFetched } from "./issues.ts";
 import { commitsIn, landings, mainBranch, notOnMain } from "./landed.ts";
 import { DailiesServer } from "./server.ts";
+import { stats as statsOf, type StatsTotals } from "./stats.ts";
 import { IDEA_STATUSES, ideaIdFrom, isIdeaStatus, optionKey, postIdFrom, Store, type AmendEvent, type IdeaStatus, type IdeaView, type Catalog, type CommitRef, type DevlogChange, type IssueEvent, type Item, type Post, type PostView, type Question, type QuestionOption, type RetractEvent } from "./store.ts";
 import { detectWhere, gitInfo, issueFromBranch } from "./where.ts";
 
@@ -894,6 +895,51 @@ async function idea(argv: string[]): Promise<void> {
 	}
 }
 
+// stats --------------------------------------------------------------------------
+
+function duration(ms: number): string {
+	if (ms < 60_000) return `${Math.round(ms / 1000)}s`;
+	if (ms < 3_600_000) return `${Math.round(ms / 60_000)}m`;
+	if (ms < 86_400_000) return `${(ms / 3_600_000).toFixed(1)}h`;
+	return `${(ms / 86_400_000).toFixed(1)}d`;
+}
+
+async function statsCommand(argv: string[]): Promise<void> {
+	const args = parse(argv, { values: ["--days", "--project"], flags: ["--json", "--here"] });
+	const days = Number(args.values.get("--days") ?? 30);
+	if (!Number.isInteger(days) || days < 1 || days > 366) fail("--days is a whole number from 1 to 366");
+	const project = args.flags.has("--here") ? detectWhere(process.cwd(), env).project : args.values.get("--project");
+	const view = statsOf(store().load(), { days, project, tz: -new Date().getTimezoneOffset() });
+	if (args.flags.has("--json")) return json({ stats: view });
+	const change = (key: keyof StatsTotals) => {
+		const delta = view.totals[key] - view.previous[key];
+		return delta ? ` (${delta > 0 ? "+" : ""}${delta})` : "";
+	};
+	const row = (label: string, key: keyof StatsTotals) => `  ${label.padEnd(16)}${String(view.totals[key]).padStart(5)}${change(key)}`;
+	const { response, verdicts, ideas } = view;
+	const marked = verdicts.adopted + verdicts.rejected;
+	print(
+		[
+			`Last ${days} days${project ? ` in ${project}` : ""} (${view.daily[0]!.day} – ${view.daily[view.daily.length - 1]!.day}; change from the ${days} days before)`,
+			row("Reviews", "reviews"),
+			row("Files shown", "files"),
+			row("Devlog entries", "devlog"),
+			row("Questions", "questions"),
+			row("  answered", "answered"),
+			row("Your replies", "replies"),
+			row("Ideas added", "ideasAdded"),
+			row("Ideas done", "ideasDone"),
+			`  First reply     ${response.median === null ? "—" : `median ${duration(response.median)} over ${response.samples} posts`}`,
+			`  Marks           ${marked ? `${verdicts.adopted} OK, ${verdicts.rejected} not (${Math.round((verdicts.adopted / marked) * 100)}% OK); ${verdicts.unmarked} unmarked` : "none"}`,
+			view.kinds.length ? `  Kinds           ${view.kinds.map((entry) => `${entry.kind} ${entry.count}`).join(", ")}` : "",
+			`  Ideas now       ${IDEA_STATUSES.map((status) => `${status} ${ideas[status]}`).join(", ")}`,
+			view.projects.length && !project ? `  Projects        ${view.projects.slice(0, 6).map((entry) => `${entry.project} ${entry.reviews + entry.devlog}`).join(", ")}` : "",
+		]
+			.filter(Boolean)
+			.join("\n"),
+	);
+}
+
 // viewer --------------------------------------------------------------------------
 
 async function serve(argv: string[]): Promise<void> {
@@ -1021,6 +1067,8 @@ Usage:
       doing, done, dropped). Ideas belong to this repository unless --global.
   kustomad idea set <n_…> [--status S] [--title T] [--body TEXT|-] [--project P|--global]
   kustomad idea list [--status S] [--all] [--project P|--everywhere] [--q WORDS] [--json] | show <n_…>
+  kustomad stats [--days 30] [--project P|--here] [--json]
+      Activity over a period: reviews, replies, response time, marks, ideas (the 分析 tab).
   kustomad open | status | stop | serve [--port P] [--host H]
   kustomad guide                Instructions to give a coding agent (CLAUDE.md / AGENTS.md)
   kustomad hook <pre-tool-use|session-start|user-prompt-submit|stop|session-end>
@@ -1063,6 +1111,8 @@ async function main(argv: string[]): Promise<void> {
 		case "idea":
 		case "ideas":
 			return idea(rest);
+		case "stats":
+			return statsCommand(rest);
 		case "serve":
 			return serve(rest);
 		case "open":

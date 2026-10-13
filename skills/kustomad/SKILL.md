@@ -122,6 +122,13 @@ belong to this repository unless `--global`. When the user asks what to work on 
 read `kustomad idea list`. Move an idea to `doing` when you start it and to `done` once
 it has landed.
 
+## Insights
+
+`kustomad stats [--days 30] [--project P|--here] [--json]` gives what the viewer's Insights
+tab charts: reviews, the user's replies, time to first reply, marks, devlog entries and
+ideas over a period, compared with the period before. Read it when the user asks how
+work has been going or wants a period summarised in numbers.
+
 ## Devlog
 
 A record of how the product changed, written from merged work, so updates and devlog
